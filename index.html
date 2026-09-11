@@ -6545,14 +6545,17 @@ function build(cfg, log) {
     return out.asiancup.map((x) => x.year + ":" + (x.winName || x.win)).join(" ");
   }, note);
 
+  let MGRID = null, MGRU2 = null;
   part("⑧ 감독 재임", () => {
     const b = fs.readFileSync(NEED(D.manager, "감독 기록(dumps.manager)"));
     const SIG = Buffer.from("15ffffffffffff", "hex");
     const byTeam = new Map();
+    const 사람수 = new Map();
     let a = -1;
     while ((a = b.indexOf(SIG, a + 1)) >= 0) {
       const id = b.readUInt32LE(a + 7);
       if (id < 1 || id > 400000) continue;
+      사람수.set(id, (사람수.get(id) || 0) + 1);
       const team = b.readUInt32LE(a + 12);
       const day = b.readUInt16LE(a + 16) & 0x1ff, y = b.readUInt16LE(a + 18);
       if (y < 2000 || y > 2060 || day < 1 || day > 366) continue;
@@ -6561,15 +6564,20 @@ function build(cfg, log) {
     }
 
     if (!byTeam.size) throw new Error("감독 기록에서 레코드를 하나도 못 찾았다 — 이 구획이 아니거나 배치가 다르다");
+
+    MGRID = [...사람수].sort((x, z) => z[1] - x[1])[0][0];
     out.spells = [...byTeam].map(([team, ys]) => {
       const a2 = [...ys].sort();
       return { team: team, name: NAT[team] || null, from: a2[0], to: a2[a2.length - 1], years: a2.length };
     }).sort((x, z) => x.from - z.from || z.years - x.years);
 
-    if (Array.isArray(cfg.journey) && cfg.journey.length && SPELLS.length) {
+    if (Array.isArray(cfg.journey) && cfg.journey.length) {
       const Y = (v) => Number(String(v).slice(0, 4));
-      const 겹침 = (j, a, b) => (j.seasons || []).filter((t) => { const y = Y(t); return y >= a && y < b; }).length;
-      const 칸 = SPELLS.map((sp) => ({ sp: sp, a: Y(sp.from), b: sp.until ? Y(sp.until) : 9999, done: false }));
+      const 겹침 = (j, a, b) => (j.seasons || []).filter((t) => { const y = Y(t); return y >= a && y <= b; }).length;
+
+      const 칸 = (SPELLS && SPELLS.length)
+        ? SPELLS.map((sp) => ({ sp: sp, a: Y(sp.from), b: sp.until ? Y(sp.until) - 1 : 9999, done: false }))
+        : out.spells.map((sp) => ({ sp: sp, a: sp.from, b: sp.to, done: false }));
       const 쓴구단 = new Set(), 정답 = new Map(), 어긋남 = new Set();
 
       for (const pass of [1, 2]) {
@@ -6597,7 +6605,9 @@ function build(cfg, log) {
     }
 
     {
-      const 끝 = out.spells.slice().sort((x, z) => (x.to - z.to) || (x.from - z.from)).pop();
+
+      const 구단만 = out.spells.filter((x) => !NAT[x.team]);
+      const 끝 = (구단만.length ? 구단만 : out.spells).slice().sort((x, z) => (x.to - z.to) || (x.from - z.from)).pop();
       if (끝) out.now = { team: 끝.team, name: 끝.name || null, from: 끝.from, to: 끝.to };
     }
     return out.spells.length + '곳' + (out.spellNames ? ' · 이름 ' + out.spellNames.붙음 + '개' : '');
@@ -6682,11 +6692,17 @@ function build(cfg, log) {
     const byWho = new Map();
     for (const r of mine) { if (!byWho.has(r.who)) byWho.set(r.who, []); byWho.get(r.who).push(r); }
 
+    if (MGRID != null) {
+      if (byWho.has(MGRID)) MGRU2 = MGRID;
+      else if (PEOPLE) for (const [u2, p] of PEOPLE) if (p.id === MGRID) { MGRU2 = u2; break; }
+    }
     const players = [...byWho].map(([u2, rs]) => {
-      const onlyMgr = rs.every((r) => MGR.has(r.a));
+      const 본인 = MGRU2 != null && u2 === MGRU2;
+      const onlyMgr = 본인 || rs.every((r) => MGR.has(r.a));
       const yrs = [...new Set(rs.map((r) => r.y))].sort();
       const t = new Map(); for (const r of rs) t.set(r.a, (t.get(r.a) || 0) + 1);
-      return { uid2: u2, name: NAMEOF(u2) || (onlyMgr ? (cfg.managerName || null) : null), manager: onlyMgr,
+
+      return { uid2: u2, name: (본인 && cfg.managerName) || NAMEOF(u2) || null, manager: onlyMgr,
         total: rs.length, kinds: t.size, from: yrs[0], to: yrs[yrs.length - 1],
         named: [...t].filter(([a]) => AWARD[a]).map(([a, c]) => ({ name: AWARD[a], n: c }))
           .sort((x, z) => z.n - x.n),
