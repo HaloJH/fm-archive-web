@@ -6069,25 +6069,23 @@ function cupRounds(file) {
 }
 
 const PSIG = Buffer.from("01006c0701006c07", "hex");
+
 function scanPeople(file) {
   const g = fs.readFileSync(file);
   const m = new Map();
-  let at = -1;
-  while ((at = g.indexOf(PSIG, at + 1)) >= 0) {
+  for (let q = 0; q + 9 <= g.length; q++) {
+    if (!(g[q] === 0x01 && g[q + 1] === 0x00 && g[q + 2] === 0x6c && g[q + 3] === 0x07 && g[q + 4] === 0x00)) continue;
+    const u2 = g.readUInt32LE(q + 5);
+    if (!u2 || u2 === 0xffffffff || u2 > 2000000) continue;
+    const at = g.indexOf(PSIG, q);
+    if (at < 0 || at - q > 1200) continue;
     const raw = g.readUInt32LE(at + 8);
     const id = (raw >= 1 && raw <= 400000) ? raw : null;
     const len = g.readUInt32LE(at + 44); if (len > 120) continue;
     const born = g.readUInt16LE(at + 48 + len + 2); if (born < 1850 || born > 2200) continue;
     let full = "";
-    if (len) { full = g.slice(at + 48, at + 48 + len).toString("utf8"); if (/[\x00-\x1f]/.test(full)) continue; }
-
-    let q = -1;
-    for (let p = at - 5, lo = Math.max(0, at - 1200); p >= lo; p--)
-      if (g[p] === 1 && g[p + 1] === 0 && g[p + 2] === 0x6c && g[p + 3] === 7 && g[p + 4] === 0) { q = p; break; }
-    if (q < 0) continue;
-    const u2 = g.readUInt32LE(q + 5); if (u2 === 0xffffffff || u2 === 0) continue;
+    if (len) { full = g.slice(at + 48, at + 48 + len).toString("utf8"); if (/[ -]/.test(full)) continue; }
     if (!m.has(u2)) m.set(u2, []);
-
     m.get(u2).push({ id: id, born: born, full: full, sur: g.readUInt32LE(at + 34),
                      loc: g.readUInt32LE(at + 39) });
   }
