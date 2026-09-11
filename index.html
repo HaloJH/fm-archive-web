@@ -3767,7 +3767,9 @@ try {
     if (!views[v]) v = 'mgr';
     for (const k in views) if (views[k]) views[k].hidden = (k !== v);
     for (const btn of nav.children) btn.setAttribute('aria-selected', String(btn.dataset.v === v));
-    if (push && location.hash !== '#' + v) history.replaceState(null, '', '#' + v);
+
+    if (push && location.hash !== '#' + v)
+      try { history.replaceState(null, '', '#' + v); } catch (e) {   }
 
     const on = views[v] && views[v].querySelector('.ss-card.on, .pd-card');
     if (on) on.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
