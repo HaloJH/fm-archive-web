@@ -4814,6 +4814,49 @@ for (const id of [679, 601, 675, 1156, 447]) {
 fs.writeFileSync(process.argv[3], JSON.stringify([...byId]));
 
 });</script>
+<script>NodeRun.define("comps.js", function (module, exports, require, process, console, Buffer) {
+
+"use strict";
+const fs = require("fs");
+
+const SIG = Buffer.from("01006c070100000019", "hex");
+const NAME_AT = 335;
+
+function readComps(file) {
+  const b = fs.readFileSync(file);
+  const out = new Map();
+  let at = -1;
+  while ((at = b.indexOf(SIG, at + 1)) >= 0) {
+    const id = b.readUInt16LE(at + 9);
+    const o = at + NAME_AT;
+    if (o + 4 >= b.length) continue;
+    const len = b.readUInt32LE(o);
+    if (len < 6 || len > 70) continue;
+    let t;
+    try { t = b.slice(o + 4, o + 4 + len).toString("utf8"); } catch (e) { continue; }
+    if (/\uFFFD/.test(t) || /[\x00-\x1f]/.test(t)) continue;
+    if (!/^[가-힣A-Za-z0-9 .&'\-]+$/.test(t)) continue;
+    if (!/[ 가-힣]/.test(t)) continue;
+
+    if (out.has(id) && out.get(id) !== t) { out.set(id, null); continue; }
+    if (!out.has(id)) out.set(id, t);
+  }
+  for (const [k, v] of out) if (!v) out.delete(k);
+  return out;
+}
+
+module.exports = { readComps, SIG, NAME_AT };
+
+if (require.main !== module) return;
+
+const F = process.argv[2];
+if (!F) { console.log("쓰기: node save/comps.js <game_db.dat>"); process.exit(1); }
+const m = readComps(F);
+console.log("대회 이름 " + m.size + "개");
+for (const [id, name] of [...m].sort((a, c) => a[0] - c[0]))
+  console.log("  " + String(id).padStart(6) + "  " + name);
+
+});</script>
 <script>NodeRun.define("payload.js", function (module, exports, require, process, console, Buffer) {
 "use strict";
 
@@ -4968,6 +5011,15 @@ function build(cfg, log) {
   } catch (e) { say("  ⚠ 내보내기 없음 (" + e.message + ") — 내보내기가 필요한 칸은 안 만든다"); ARC = C = null; }
   try { SQ = JSON.parse(fs.readFileSync(R(cfg.squad), "utf8")); } catch (e) { SQ = null; }
 
+  let COMP = null;
+  part("⓪ 대회 이름표", () => {
+    const g = (D.gameDb || [])[0];
+    if (!g) throw new Error("game_db 가 없다");
+    COMP = require(path.join(AR, "save", "comps.js")).readComps(R(g));
+    if (!COMP.size) { COMP = null; throw new Error("이름이 붙은 대회를 하나도 못 찾았다"); }
+    return COMP.size + "개 — " + [...COMP].slice(0, 3).map(([k, v]) => k + " " + v).join(" · ");
+  }, note);
+
   let HIST = C ? C.history : null;
   if (!HIST && cfg.history) {
     try {
@@ -5004,7 +5056,8 @@ function build(cfg, log) {
       const ex = exSeason.get(h.season);
 
       const r = { season: h.season, division: h.division,
-        divName: DIV[h.division] || ("디비전 " + h.division),
+
+        divName: (COMP ? COMP.get(h.division) : DIV[h.division]) || ("디비전 " + h.division),
         standing: h.standing, why: h.why, stats: h.stats,
         cups: { finals: fin.length, win: win, lose: lose, unk: fin.length - win - lose,
           deepest: h.cups.length ? Math.min.apply(null, h.cups.map((c) => c.teams)) : null,
