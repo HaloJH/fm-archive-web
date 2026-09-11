@@ -3243,7 +3243,9 @@ const FOEOF = (t) => { const v = t ? FOEMAP.get(t) : null; return v && v.conf >=
 })();
 
 (function podium() {
-  const L = D.podium; if (!L || !L.length) return;
+
+  const L = (D.podium || []).filter(function (c) { return !c.mgr; });
+  if (!L.length) return;
   const pick = $('pdpick'), rail = $('pdrail');
   if (!pick || !rail) return;
   const sl = (y) => (y - 1) + '-' + String(y % 100).padStart(2, '0');
@@ -3475,7 +3477,8 @@ const AWARD_OF = (function () {
 })();
 const PODIUM_OF = (function () {
   const m = new Map();
-  for (const c of (D.podium || []))
+
+  for (const c of (D.podium || []).filter(function (x) { return !x.mgr; }))
     for (const s of (c.seasons || []))
       (s.p || []).forEach(function (q, i) {
         if (!q || !q.name) return;
@@ -4859,6 +4862,438 @@ for (const [id, name] of [...m].sort((a, c) => a[0] - c[0]))
   console.log("  " + String(id).padStart(6) + "  " + name);
 
 });</script>
+<script>NodeRun.define("number.js", function (module, exports, require, process, console, Buffer) {
+
+"use strict";
+const fs = require("fs");
+const path = require("path");
+
+const WIN = 300;
+
+function numberOf(b, at, now, floor) {
+  const lim = Math.max(floor || 0, at - WIN);
+  const dstr = (x) => {
+    if (x < 0 || x + 4 > b.length) return null;
+    const d = b.readUInt16LE(x) & 0x1ff, y = b.readUInt16LE(x + 2);
+    if (y < 1990 || y > 2060 || d < 1 || d > 366) return null;
+    const t = new Date(Date.UTC(y, 0, 1)); t.setUTCDate(d);
+    return t.toISOString().slice(0, 10);
+  };
+  for (let q = at - 30; q >= lim; q--) {
+    const d = dstr(q);
+    if (!d || (now && d > now)) continue;
+    const A = b[q + 4]; if (A < 40 || A > 110) continue;
+    const n = b[q + 7]; if (n < 1 || n > 99) continue;
+    if (b[q + 8] !== 0) continue;
+    let z = true;
+    for (let k = 1; k <= 4; k++) if (b[q - k] !== 0) { z = false; break; }
+    if (!z) continue;
+    return n;
+  }
+  return null;
+}
+module.exports = { numberOf, WIN };
+if (require.main !== module) return;
+
+const DUMP = process.argv[2], MAP = process.argv[3];
+if (!DUMP || !MAP) {
+  console.log("쓰기: node save/number.js <덤프폴더> <정답지짝.json>");
+  process.exit(1);
+}
+if (!fs.existsSync(MAP)) {
+  console.log("정답지 짝 파일이 없다: " + MAP);
+  console.log("  save/roster.js 의 40명을 세이브에서 찾아 [{num, at}] 로 만들어 두어야 한다.");
+  process.exit(1);
+}
+const b = fs.readFileSync(DUMP + "/game_db.dat");
+const NOW_Y = b.readUInt16LE(38);
+const nowD = b.readUInt16LE(36) & 0x1ff;
+const t = new Date(Date.UTC(NOW_Y, 0, 1)); t.setUTCDate(nowD);
+const NOW = t.toISOString().slice(0, 10);
+const F = JSON.parse(fs.readFileSync(MAP, "utf8")).sort((a, c) => a.num - c.num);
+let ok = 0, wrong = [], none = [];
+for (const f of F) {
+  const n = numberOf(b, f.at, NOW);
+  if (n === null) none.push(f.num + "번 " + f.name);
+  else if (n === f.num) ok++;
+  else wrong.push(f.num + "번 " + f.name + " → " + n);
+}
+console.log("세이브 " + NOW + " · 정답지 짝 " + F.length + "명");
+console.log("맞음 " + ok + " · 틀림 " + wrong.length + " · 못 찾음 " + none.length);
+if (wrong.length) console.log("  틀림: " + wrong.join(" | "));
+if (none.length) console.log("  못 찾음: " + none.join(" · "));
+console.log(wrong.length === 0 ? "\n✓ 틀린 답이 없다." : "\n실패: 틀린 답이 생겼다. 창(WIN)을 좁혀라.");
+process.exit(wrong.length === 0 ? 0 : 1);
+
+});</script>
+<script>NodeRun.define("contract.js", function (module, exports, require, process, console, Buffer) {
+
+"use strict";
+const fs = require("fs");
+
+const WMIN = 1, WMAX = 5000000;
+const SIG = Buffer.from("01006c0701006c07", "hex");
+
+function makeDayStr(b) {
+  const saveY = b.readUInt16LE(38);
+  const cap = (saveY >= 1990 && saveY <= 2200) ? saveY + 12 : 2100;
+  return (q) => {
+    if (q < 0 || q + 4 > b.length) return null;
+    const d = b.readUInt16LE(q) & 0x1ff, y = b.readUInt16LE(q + 2);
+    if (y < 1990 || y > cap || d < 1 || d > 366) return null;
+    const t = new Date(Date.UTC(y, 0, 1)); t.setUTCDate(d);
+    return t.toISOString().slice(0, 10);
+  };
+}
+
+function unset(b, q) {
+  return q >= 0 && q + 4 <= b.length &&
+         b[q] === 1 && b[q + 1] === 0 && b[q + 2] === 0x6c && b[q + 3] === 7;
+}
+
+function contractAt(b, at, floor) {
+  const dayStr = makeDayStr(b);
+  let w = -1;
+  for (let x = at - 8; x >= floor + 4; x--) {
+    if (b[x] !== 1 || b[x + 1] !== 0 || b[x + 2] !== 0) continue;
+    if (b[x + 3] !== 255 || b[x + 4] !== 255 || b[x + 5] !== 255 || b[x + 6] !== 255) continue;
+    const v = b.readUInt32LE(x - 4);
+    if (v < WMIN || v > WMAX) continue;
+    w = x - 4; break;
+  }
+  if (w < 0) return null;
+  let to = null, first = null, from = null;
+  for (let k = 0; k <= 12; k++) {
+    const q = w - 55 - 29 * k;
+    if (q < floor) break;
+    const a = dayStr(q), c = dayStr(q + 4);
+
+    if (a && (c || unset(b, q + 4))) { to = a; first = c; break; }
+  }
+
+  from = dayStr(w - 36);
+  if (from && to && from > to) from = null;
+  return { wage: b.readUInt32LE(w), to, from, firstSigned: first };
+}
+module.exports = { contractAt };
+if (require.main !== module) return;
+
+const DB = process.argv[2];
+if (!DB) { console.log("쓰기: node save/contract.js <덤프>/game_db.dat"); process.exit(1); }
+const b = fs.readFileSync(DB);
+const dayStr = makeDayStr(b);
+const NOW = (() => { const y = b.readUInt16LE(38), d = b.readUInt16LE(36) & 0x1ff;
+  const t = new Date(Date.UTC(y, 0, 1)); t.setUTCDate(d); return t.toISOString().slice(0, 10); })();
+const per = [];
+{ let at = -1;
+  while ((at = b.indexOf(SIG, at + 1)) >= 0) {
+    const raw = b.readUInt32LE(at + 8);
+    const id = (raw >= 1 && raw <= 400000) ? raw : null;
+    const len = b.readUInt32LE(at + 44); if (len > 120) continue;
+    const y = b.readUInt16LE(at + 48 + len + 2), d = b.readUInt16LE(at + 48 + len) & 0x1ff;
+    if (y < 1850 || y > 2200 || d < 1 || d > 366) continue;
+    let full = "";
+    if (len) { full = b.slice(at + 48, at + 48 + len).toString("utf8"); if (/[\x00-\x1f]/.test(full)) continue; }
+    const sur = b.readUInt32LE(at + 34);
+    if (id === null && !full && (sur === 0 || sur === 0xffffffff)) continue;
+    per.push({ at, id, end: at + 48 + len + 4 });
+  } }
+console.log("시점 " + NOW + " · 사람 " + per.length);
+let w = 0, to = 0, from = 0, past = 0;
+for (let i = 0; i < per.length; i++) {
+  const c = contractAt(b, per[i].at, i > 0 ? per[i - 1].end : 0);
+  if (!c) continue;
+  w++;
+  if (c.to) { to++; if (c.to < NOW) past++; }
+  if (c.from) from++;
+}
+console.log("주급 " + w + " (" + (100 * w / per.length).toFixed(1) + "%) · 만료 " + to + " · 시작 " + from);
+console.log("만료가 과거인 사람 " + past + " (" + (100 * past / (to || 1)).toFixed(2) + "%)  ← 0에 가까워야 한다");
+process.exit(past / (to || 1) < 0.02 ? 0 : 1);
+
+});</script>
+<script>NodeRun.define("squad.js", function (module, exports, require, process, console, Buffer) {
+
+const fs = require("fs");
+
+const D = process.argv[2];
+const argv = process.argv.slice(3);
+const VAL = argv.includes("--값") ? Number(argv[argv.indexOf("--값") + 1]) : null;
+const NAME = VAL === null ? argv[0] : null;
+if (!D || (VAL === null && !NAME && !TEAMS)) {
+  console.log("쓰기: node save/squad.js <덤프폴더> --팀 570,34337,34338 [출력.json]\n" +
+            "      번호는 node save/whose.js <덤프폴더> <구단이름> 으로 찾는다");
+  process.exit(1);
+}
+const TEAMS = (() => { const i = argv.indexOf("--팀");
+  return i < 0 ? null : new Set(argv[i + 1].split(",").map(Number)); })();
+const skip = new Set();
+argv.forEach((x, i) => { if (x === "--확인" || x === "--값" || x === "--팀") { skip.add(i); skip.add(i + 1); } });
+if (VAL === null) skip.add(0);
+const OUT = argv.find((x, i) => !skip.has(i) && !x.startsWith("--")) || null;
+const CHECK = argv.includes("--확인") ? Number(argv[argv.indexOf("--확인") + 1]) : null;
+
+const { numberOf } = require("./number.js");
+const b = fs.readFileSync(D + "/game_db.dat");
+const clubs = new Map(JSON.parse(fs.readFileSync(D + "/clubs.json")));
+
+const DICTF = D + "/dict.json";
+const dict = fs.existsSync(DICTF)
+  ? new Map(JSON.parse(fs.readFileSync(DICTF, "utf8")).byId) : null;
+
+let CLUB, UID;
+if (TEAMS) {
+  UID = null;
+
+  CLUB = { id: null, full: "(팀 번호로 지정)", short: [...TEAMS].join(","), teams: [...TEAMS], field: "블록-23" };
+  console.log("팀 번호  " + [...TEAMS].join(" · ") + "   (블록 -23 로 고른다)");
+} else if (VAL !== null) {
+  UID = VAL;
+  CLUB = clubs.get(VAL - 1) || { id: VAL - 1, full: "(표에 없는 구단)", short: "?" };
+  console.log("구단  " + CLUB.full + "  (구단 칸 값 " + UID + " 을 직접 지정)");
+} else {
+  const cand = [...clubs.values()].filter((c) =>
+    (c.short && c.short.includes(NAME)) || (c.full && c.full.includes(NAME)));
+  if (!cand.length) { console.log("구단 \"" + NAME + "\" 을 clubs.json 에서 못 찾았다. --값 으로 지정할 수 있다(머리말)"); process.exit(1); }
+  if (cand.length > 1) {
+    console.log("이름이 여럿 걸린다. 하나로 좁혀 달라:");
+    for (const c of cand.slice(0, 10)) console.log("   표id " + c.id + "  " + c.full + " / " + c.short);
+    process.exit(1);
+  }
+  CLUB = cand[0]; UID = CLUB.id + 1;
+  console.log("구단  " + CLUB.full + "  (표 id " + CLUB.id + " → 구단 칸 값 " + UID + ")");
+}
+
+const dayStr = (d, y) => (y < 1850 || y > 2200 || d < 1 || d > 366) ? null :
+  (() => { const t = new Date(Date.UTC(y, 0, 1)); t.setUTCDate(d); return t.toISOString().slice(0, 10); })();
+const NOW_Y = b.readUInt16LE(38);
+
+const NOW = dayStr(b.readUInt16LE(36) & 0x1ff, NOW_Y);
+console.log("시점  " + (dayStr(b.readUInt16LE(36) & 0x1ff, NOW_Y) || "?"));
+
+function snapStart(a) {
+  const good = [];
+  for (let s = -4; s <= 4; s++) {
+    const q = a + s;
+    if (q - 21 < 0 || q + 54 > b.length) continue;
+    let ok = true;
+    for (let k = -21; k <= -16; k++) if (b[q + k] !== 0) { ok = false; break; }
+    if (!ok || b[q - 14] !== 1) continue;
+    for (let k = -15; k <= -1; k++) if (b[q + k] > 20) { ok = false; break; }
+    if (!ok) continue;
+    for (let k = 0; k < 54; k++) { const v = b[q + k]; if (v < 1 || v > 100) { ok = false; break; } }
+    if (ok) good.push(q);
+  }
+  return good.length === 1 ? good[0] : null;
+}
+
+const POS_AT = { Pgoa: -15, Pdls: -13, Pdce: -12, Pdrs: -11, Pdmc: -10, Pmls: -9,
+  Pmce: -8, Pmrs: -7, Paml: -6, Pamc: -5, Pamr: -4, Pace: -3, Pwbl: -2, Pwbr: -1 };
+
+const SIG = Buffer.from("01006c0701006c07", "hex");
+const MARK = Buffer.from("01006c0701006c0700000000", "hex");
+
+const PA_CODES = new Set([171, 181, 191, 201, 211, 221, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255]);
+function paOf(b, blockAt) { const v = b[blockAt + 80];
+  return (PA_CODES.has(v) || v < 1 || v > 200) ? null : v; }
+
+const { contractAt } = require("./contract.js");
+const contractOf = (b, personAt, floor) => contractAt(b, personAt, floor);
+
+const MARK3 = Buffer.from("01006c0701006c0701006c0700000000", "hex");
+
+const SNAP = 47, SREC = 71;
+const SGRP = { gk: [0, 11], tech: [11, 25], ment: [25, 39], phys: [39, 47] };
+function attrHistOf(b, blockAt, personAt, saveDate) {
+  if (personAt - blockAt < 300) return null;
+  const cur = b.slice(blockAt, blockAt + 54);
+  const need = new Map(); for (const v of cur) need.set(v, (need.get(v) || 0) + 1);
+
+  let best = -1, at = -1;
+  for (let q = blockAt + 54; q + SNAP <= personAt; q++) {
+    const m = new Map(need); let hit = 0;
+    for (let k = 0; k < SNAP; k++) { const v = b[q + k]; const c = m.get(v); if (c) { m.set(v, c - 1); hit++; } }
+    if (hit >= best) { best = hit; at = q; }
+  }
+  if (best < 44) return null;
+  const rows = [];
+  for (let q = at; q >= blockAt + 54; q -= SREC) {
+    let ok = 0; for (let k = 0; k < SNAP; k++) { const v = b[q + k]; if (v >= 1 && v <= 100) ok++; }
+    if (ok < SNAP) break;
+    rows.unshift(b.slice(q, q + SNAP));
+  }
+  if (rows.length < 6) return null;
+  const avg = (r, g) => { const [i, j] = SGRP[g]; let t = 0;
+    for (let k = i; k < j; k++) t += r[k]; return +(t / (j - i)).toFixed(1); };
+
+  const d = new Date(saveDate + "T00:00:00Z");
+  const st = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - (rows.length - 1), 1));
+  return { from: st.getUTCFullYear() + "-" + String(st.getUTCMonth() + 1).padStart(2, "0"),
+           tech: rows.map((r) => avg(r, "tech")), ment: rows.map((r) => avg(r, "ment")),
+           phys: rows.map((r) => avg(r, "phys")) };
+}
+const CAR = { lgGoal: 3, acGoal: 4, acApp: 5, lgApp: 7 };
+
+function careerOf(b, from) {
+  const w = b.subarray(from, Math.min(from + 900, b.length));
+  let i = -1;
+  while ((i = w.indexOf(MARK3, i + 1)) >= 0) {
+    const M = from + i;
+    if (M + 59 > b.length || b[M + 28] !== 1) continue;
+    const v = []; let ok = true;
+    for (let k = 0; k < 15; k++) { const x = b.readUInt16LE(M + 29 + k * 2); v.push(x); if (x > 2000) { ok = false; break; } }
+    if (ok) return { lgApp: v[CAR.lgApp], lgGoal: v[CAR.lgGoal], acApp: v[CAR.acApp], acGoal: v[CAR.acGoal] };
+  }
+  return null;
+}
+const rec = [];
+{ let st = -1;
+  for (let p = 0; p <= b.length; p++) {
+    const v = p < b.length ? b[p] : 0;
+    if (v >= 1 && v <= 100) { if (st < 0) st = p; continue; }
+    if (st >= 0 && p - st >= 56) {
+      const a = p - 54; const seen = new Set();
+      for (let k = 0; k < 54; k++) seen.add(b[a + k]);
+      let ok = true;
+      for (let k = 0; k < 14; k++) { const q = a - 16 + k; if (q < 0 || b[q] > 20) { ok = false; break; } }
+      if (seen.size >= 4 && ok) { const a2 = snapStart(a); if (a2 !== null) rec.push(a2); }
+    }
+    st = -1;
+  } }
+
+const per = [];
+{ let at = -1;
+  while ((at = b.indexOf(SIG, at + 1)) >= 0) {
+    const raw = b.readUInt32LE(at + 8);
+    const id = (raw >= 1 && raw <= 400000) ? raw : null;
+    const len = b.readUInt32LE(at + 44); if (len > 120) continue;
+    const y = b.readUInt16LE(at + 48 + len + 2);
+    const dob = dayStr(b.readUInt16LE(at + 48 + len) & 0x1ff, y);
+    if (!dob) continue;
+    let full = "";
+    if (len) { full = b.slice(at + 48, at + 48 + len).toString("utf8");
+               if (/[\x00-\x1f]/.test(full)) continue; }
+    const sur = b.readUInt32LE(at + 34);
+    if (id === null && !full && (sur === 0 || sur === 0xffffffff)) continue;
+    per.push({ at, id, dob, born: y, sur, full, end: at + 48 + len + 4 });
+  } }
+const offs = per.map((x) => x.at);
+const nextIdx = (P) => { let lo = 0, hi = offs.length - 1, ans = -1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (offs[m] >= P) { ans = m; hi = m - 1; } else lo = m + 1; }
+  return ans; };
+
+const claimAll = new Map();
+for (const p of rec) { const i = nextIdx(p + 54); if (i < 0) continue;
+  claimAll.set(i, (claimAll.get(i) || 0) + 1); }
+let uniq1 = 0; for (const [, c] of claimAll) if (c === 1) uniq1++;
+const injPct = claimAll.size ? 100 * uniq1 / claimAll.size : 0;
+console.log("배치 검사  사람 " + per.length + " · 블록 " + rec.length +
+  " · 일대일 " + injPct.toFixed(1) + "%");
+
+const squad = [], byPerson = new Map();
+for (const p of rec) {
+  if (TEAMS) {
+
+    if (p - 23 < 0 || !TEAMS.has(b.readUInt32LE(p - 23))) continue;
+  } else {
+    const w = b.subarray(p, Math.min(p + 1400, b.length));
+    const i = w.indexOf(MARK);
+    if (i < 0 || p + i + 16 > b.length) continue;
+    if (b.readUInt32LE(p + i + 12) !== UID) continue;
+  }
+  const j = nextIdx(p + 54); if (j < 0) continue;
+  const q = per[j];
+  const pkey = q.id === null ? "@" + q.at : q.id;
+  if (byPerson.has(pkey)) continue;
+  byPerson.set(pkey, true);
+  const ca = b[p + 79];
+
+  const ht = b[p + 84], wt = b[p + 82];
+  const joined = dayStr(b.readUInt16LE(q.at - 5) & 0x1ff, b.readUInt16LE(q.at - 3));
+  const car = careerOf(b, p);
+  const hist = attrHistOf(b, p, q.at, NOW);
+  const floor = j > 0 ? per[j - 1].end : 0;
+  const ct = contractOf(b, q.at, floor);
+  const shirt = numberOf(b, q.at, NOW, floor);
+  squad.push({ person: q.id, dob: q.dob, age: NOW_Y - q.born, number: shirt,
+               team: TEAMS ? b.readUInt32LE(p - 23) : null,
+               height: (ht >= 120 && ht <= 230) ? ht : null,
+               weight: (wt >= 30 && wt <= 150) ? wt : null,
+               joined,
+
+               lgApp: car ? car.lgApp : null, lgGoal: car ? car.lgGoal : null,
+               acApp: car ? car.acApp : null, acGoal: car ? car.acGoal : null,
+               attrHist: hist,
+
+               pa: paOf(b, p),
+
+               wage: ct ? ct.wage : null,
+               contractFrom: ct ? ct.from : null,
+               contractTo: ct ? ct.to : null,
+               firstSigned: ct ? ct.firstSigned : null,
+               ca: (ca >= 10 && ca <= 200) ? ca : null,
+               name: q.full || (dict ? dict.get(q.sur) : null) || null,
+               sur: q.sur,
+               positions: Object.fromEntries(Object.entries(POS_AT).map(([t, o]) => [t, b[p + o]])),
+               attrs: [...b.slice(p, p + 54)] });
+}
+squad.sort((a, c) => a.person - c.person);
+
+if (TEAMS && TEAMS.size > 1) {
+  const byTeam = new Map();
+  for (const x of squad) { if (!byTeam.has(x.team)) byTeam.set(x.team, []); byTeam.get(x.team).push(x.age); }
+  const rank = [...byTeam.entries()]
+    .map(([t, a]) => { a.sort((p, q2) => p - q2); return { t, med: a[a.length >> 1] }; })
+    .sort((a, c) => c.med - a.med);
+  const LABEL = ["1군", "U21", "U18"];
+  const name = new Map(rank.map((r, k) => [r.t, LABEL[k] || ("팀" + r.t)]));
+  for (const x of squad) x.squad = name.get(x.team) || null;
+  console.log("팀 구분  " + rank.map((r, k) => (LABEL[k] || r.t) + " " + r.t +
+    "(" + byTeam.get(r.t).length + "명 · 나이중앙 " + r.med + ")").join("  "));
+} else if (TEAMS) {
+  console.log("팀이 하나뿐이라 1군/U21 구분은 붙이지 않는다");
+}
+
+const bad = [];
+if (injPct < 95) bad.push("일대일이 " + injPct.toFixed(1) + "% 뿐이다 — 이 세이브는 배치가 다르다. " +
+  "여기서 나오는 스쿼드는 그럴듯해도 남의 선수들이다(머리말 참고)");
+if (squad.length < 10 || squad.length > 400) bad.push("인원 " + squad.length + "명은 스쿼드로 보기 어렵다");
+const aged = squad.filter((x) => x.age >= 13 && x.age <= 42).length;
+const agePct = squad.length ? 100 * aged / squad.length : 0;
+if (agePct < 95) bad.push("선수 나이대(13~42세)가 " + agePct.toFixed(1) + "% 뿐이다");
+if (CHECK !== null && !byPerson.has(CHECK)) bad.push("확인용 사람 " + CHECK + " 이 스쿼드에 없다");
+
+const nextClub = clubs.get(UID);
+if (nextClub) {
+  console.log("\n⚠ 값 " + UID + " 은 다음 구단 \"" + (nextClub.short || nextClub.full) +
+    "\" 의 **날 id** 이기도 하다. 그쪽 참조가 섞였을 수 있다(4-26 ④).");
+  console.log("   섞였는지 보려면: 아는 선수가 들어 있는지 --확인 으로 대볼 것.");
+}
+
+console.log("\n스쿼드 " + squad.length + "명 · 나이대 " + agePct.toFixed(1) + "%" +
+  (CHECK !== null ? " · 확인용 " + CHECK + " " + (byPerson.has(CHECK) ? "있음 ✓" : "없음 ✗") : ""));
+if (bad.length) {
+  console.log("\n검산 실패 — 결과를 내놓지 않는다:");
+  for (const x of bad) console.log("   ✗ " + x);
+  process.exit(1);
+}
+const byAge = {};
+for (const x of squad) { const k = x.age < 18 ? "17세이하" : x.age < 21 ? "18~20" : x.age < 30 ? "21~29" : "30이상";
+  byAge[k] = (byAge[k] || 0) + 1; }
+console.log("나이 분포  " + Object.entries(byAge).map(([k, v]) => k + ":" + v).join("  "));
+const withCA = squad.filter((x) => x.ca != null).map((x) => x.ca).sort((a, c) => a - c);
+const named = squad.filter((x) => x.name).length;
+console.log("CA        " + withCA.length + "/" + squad.length + "명" +
+  (withCA.length ? "  중앙 " + withCA[withCA.length >> 1] + " · 최고 " + withCA[withCA.length - 1] : ""));
+console.log("이름 풀림  " + named + "/" + squad.length +
+  (dict ? "" : "   (dict.json 이 없다. save/dict.js 로 만들면 이름이 나온다)"));
+console.log("표본  " + squad.slice(0, 6).map((x) => (x.name || ("사람" + x.person)) + "(" + x.age + "세)").join("  "));
+
+if (OUT) { fs.writeFileSync(OUT, JSON.stringify({ club: CLUB, uid: UID,
+  date: dayStr(b.readUInt16LE(36) & 0x1ff, NOW_Y), squad }));
+  console.log("저장: " + OUT); }
+
+});</script>
 <script>NodeRun.define("payload.js", function (module, exports, require, process, console, Buffer) {
 "use strict";
 
@@ -5365,6 +5800,8 @@ function build(cfg, log) {
   }
 
   let PEOPLE = null, NAMEOF = null, AWARD = null;
+
+  const MGR = new Set(cfg.managerAwards || [97, 99, 101, 103]);
   part("⑨ 사람 표 · 상 이름", () => {
     AWARD = awardNames(AR);
     const gdbs = (D.gameDb || []).map(R);
@@ -5389,7 +5826,7 @@ function build(cfg, log) {
     if (!PEOPLE) throw new Error("사람 표가 없다");
 
     if (CLUB == null) throw new Error("수상 표의 구단 번호를 모른다");
-    const MGR = new Set(cfg.managerAwards || [97, 99, 101, 103]);
+
     const b = readSection(NEED(D.award, "수상 이력(dumps.award)"), SPEC.award), SZ = 82, H = 8;
     const N = (b.length - H) / SZ;
     const rows = [];
@@ -5461,7 +5898,7 @@ function build(cfg, log) {
     for (const r of all) { if (!byAward.has(r.award)) byAward.set(r.award, []); byAward.get(r.award).push(r); }
 
     out.podium = [...byAward].map(([a, v]) => ({
-      id: a, name: AWARD[a], mine: v.some((r) => r.place.some((q) => q && q.mine)),
+      id: a, name: AWARD[a], mgr: MGR.has(a), mine: v.some((r) => r.place.some((q) => q && q.mine)),
       seasons: v.sort((x, z) => x.y - z.y).map((r) => ({ y: r.y, p: r.place })) }))
       .sort((x, z) => (z.mine - x.mine) || (z.seasons.length - x.seasons.length) || x.id - z.id);
     return "상 " + out.podium.length + "종 · 시즌카드 " + all.length + "장 · 우리가 오른 상 " +
@@ -5888,6 +6325,8 @@ async function buildCareer(pt, say) {
     const at = await grabSections(file, say, journey);
     cfg.club.team = at.team;
 
+    await nameBridge(at, club, journey, say);
+
     if (at.spells) cfg.spells = at.spells;
     cfg.clubmapYear = at.year;
     cfg.history = at.history;
@@ -5950,6 +6389,37 @@ async function trophyPix() {
     try { out[WANT[k]] = await shrink(f, 96); } catch (e) {   }
   }
   return Object.keys(out).length ? out : null;
+}
+
+async function nameBridge(at, club, journey, say) {
+  if (!at.gameDb || at.team == null) { say("이름 다리 건너뜀 — 이름표가 없습니다"); return null; }
+  say("세이브 명단 뽑는 중");
+  const r = NodeRun.run("squad.js", ["/save", "--팀", String(at.team), "/sq.json"]);
+  if (r.error) { say("이름 다리 건너뜀 — 명단을 못 뽑았습니다: " + r.error.message); return null; }
+  const v = r.files.get("/sq.json");
+  let sq;
+  try { sq = JSON.parse(typeof v === "string" ? v : new TextDecoder().decode(v)); }
+  catch (e) { say("이름 다리 건너뜀 — 명단을 못 읽었습니다"); return null; }
+  if (!sq || !sq.squad || !sq.squad.length) { say("이름 다리 건너뜀 — 명단이 비었습니다"); return null; }
+
+  const d = String(sq.date || "");
+  const y = +d.slice(0, 4), mo = +d.slice(5, 7);
+  if (!y) { say("이름 다리 건너뜀 — 세이브 날짜를 못 읽었습니다: " + d); return null; }
+  const a0 = mo >= 7 ? y : y - 1;
+  const season = a0 + "-" + String(a0 + 1).slice(2);
+
+  const mine2 = (journey || []).filter((j) => j.club === club);
+  const all = [];
+  for (const j of mine2) for (const t of (j.seasons || [])) all.push(t);
+  const use = all.filter((t) => t <= season).sort().pop() || all.sort().pop();
+  if (!use) {
+    say("이름 다리 건너뜀 — 이 구단 내보내기가 없습니다");
+    return null;
+  }
+  NodeRun.put("/ar/save-squads/bridge.json", JSON.stringify({
+    archiveClub: club, season: use, savedAt: sq.date, uid: sq.uid, squad: sq.squad }));
+  say("이름 다리 놓음 — 세이브 " + season + " ↔ 내보내기 " + use + " · " + sq.squad.length + "명");
+  return use;
 }
 
 async function grabSections(file, say, journey) {
