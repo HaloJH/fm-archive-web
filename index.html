@@ -2836,8 +2836,10 @@ const tiles = [
     D.timeline.length ? "순위가 확정된 " + done.length + "시즌 중" : "연표가 없어 셀 수 없습니다"],
   ["컵 우승", cupWin, "결승 " + cupFin + "회 · 준우승 " + cupLose],
 
-  ["최고 디비전", D.timeline.length ? TIERNAME[best] : "—",
-    D.timeline.length ? "출발은 " + TIERNAME[TIER[D.timeline[0].division]] : "연표가 없습니다"],
+  ["최고 디비전", D.timeline.length ? (TIERNAME[best] || "—") : "—",
+    D.timeline.length
+      ? "출발은 " + (D.timeline[0].divName || TIERNAME[TIER[D.timeline[0].division]] || "디비전 " + D.timeline[0].division)
+      : "연표가 없습니다"],
   ["선수단", or(D.squad.length, D.squad.length + "명"), D.squad.length ? "세이브 2037-38 · 유스 포함" : "명단이 없습니다"],
   ["성장 곡선", or(D.curves.length, D.curves.length + "명"), D.curves.length ? "세 시즌 이상 남은 선수" : "내보내기가 없습니다"],
   ["대회 종류", or(D.honours.length, D.honours.length + "개"), D.honours.length ? "이름이 붙은 대회" : "대회 이름은 캡처가 있어야 압니다"]
@@ -6563,7 +6565,42 @@ function build(cfg, log) {
       const a2 = [...ys].sort();
       return { team: team, name: NAT[team] || null, from: a2[0], to: a2[a2.length - 1], years: a2.length };
     }).sort((x, z) => x.from - z.from || z.years - x.years);
-    return out.spells.length + "곳";
+
+    if (Array.isArray(cfg.journey) && cfg.journey.length && SPELLS.length) {
+      const Y = (v) => Number(String(v).slice(0, 4));
+      const 겹침 = (j, a, b) => (j.seasons || []).filter((t) => { const y = Y(t); return y >= a && y < b; }).length;
+      const 칸 = SPELLS.map((sp) => ({ sp: sp, a: Y(sp.from), b: sp.until ? Y(sp.until) : 9999, done: false }));
+      const 쓴구단 = new Set(), 정답 = new Map(), 어긋남 = new Set();
+
+      for (const pass of [1, 2]) {
+        for (const k of 칸) {
+          if (k.done) continue;
+          const 후보 = cfg.journey.map((j) => ({ club: j.club, n: 겹침(j, k.a, k.b) }))
+            .filter((x) => x.n > 0 && (pass === 1 || !쓴구단.has(x.club)));
+          후보.sort((x, z) => z.n - x.n);
+          const 위 = 후보.filter((x) => 후보.length && x.n === 후보[0].n);
+          if (위.length !== 1) continue;
+          k.done = true; 쓴구단.add(위[0].club);
+          const 앞 = 정답.get(k.sp.team);
+          if (앞 !== undefined && 앞 !== 위[0].club) 어긋남.add(k.sp.team);
+          정답.set(k.sp.team, 위[0].club);
+        }
+      }
+      for (const t of 어긋남) 정답.delete(t);
+      let 붙음 = 0;
+      for (const sp of out.spells) {
+        if (sp.name) continue;
+        const nm = 정답.get(sp.team);
+        if (nm) { sp.name = nm; sp.nameFrom = '내보내기'; 붙음++; }
+      }
+      out.spellNames = { 붙음: 붙음, 전체: out.spells.length, 어긋남: [...어긋남] };
+    }
+
+    {
+      const 끝 = out.spells.slice().sort((x, z) => (x.to - z.to) || (x.from - z.from)).pop();
+      if (끝) out.now = { team: 끝.team, name: 끝.name || null, from: 끝.from, to: 끝.to };
+    }
+    return out.spells.length + '곳' + (out.spellNames ? ' · 이름 ' + out.spellNames.붙음 + '개' : '');
   }, note);
 
   if (CLUB == null && C && C.meta && C.meta.clubId) {
@@ -7133,6 +7170,8 @@ async function buildCareer(pt, say) {
     await nameBridge(at, club, journey, say);
 
     if (at.spells) cfg.spells = at.spells;
+
+    if (journey && journey.length) cfg.journey = journey.map((j) => ({ club: j.club, seasons: j.seasons }));
     cfg.clubmapYear = at.year;
     cfg.history = at.history;
     cfg.dumps = {
