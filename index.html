@@ -3053,6 +3053,19 @@ function goods(run) {
   return d;
 }
 
+const LEAGUE_OF = (function () {
+  const m = {};
+  for (const c of (D.honours || [])) {
+    if (c.kind !== "league" || !c.win) continue;
+    for (const y of c.win) {
+      const start = c.summer ? y : y - 1;
+      const key = start + "-" + String((start + 1) % 100).padStart(2, "0");
+      (m[key] = m[key] || []).push(c);
+    }
+  }
+  return m;
+})();
+
 const FOEMAP = new Map();
 if (D.trophies) for (const s of D.trophies) for (const it of s.items)
   if (it.foe && it.foeName) FOEMAP.set(it.foe, it.foeName);
@@ -3076,6 +3089,15 @@ const FOEOF = (t) => { const v = t ? FOEMAP.get(t) : null; return v && v.conf >=
 
     const cups = el('div', { class: 'ss-cups' });
     let n = 0;
+
+    for (const lg of (LEAGUE_OF[s2.season] || [])) {
+      n++;
+      const G2 = D.trophyPix || null;
+      const lpic = (D.cupPix || {})[lg.name] || (G2 ? (G2.league || G2.cup) : null);
+      if (lpic) cups.appendChild(el('img', { class: 'win', src: lpic, loading: 'lazy',
+        alt: (lg.name || ('대회 ' + lg.comp)) + ' 우승' }));
+      else cups.appendChild(trophySVG({ from: 20, short: null }, 'win'));
+    }
     for (const run of s2.runs) {
       const kind = run.result === '우승' ? 'win' : run.result === '준우승' ? 'lose'
         : run.result === '결승' ? 'final' : null;
@@ -3088,7 +3110,8 @@ const FOEOF = (t) => { const v = t ? FOEMAP.get(t) : null; return v && v.conf >=
     }
     if (!n) cups.appendChild(el('span', { class: 'none' }, '결승 없음'));
     c.appendChild(cups);
-    const wins = s2.runs.filter(function (r) { return r.result === '우승'; }).length;
+    const wins = s2.runs.filter(function (r) { return r.result === '우승'; }).length
+      + (LEAGUE_OF[s2.season] || []).length;
     c.appendChild(el('div', { class: 'ss-n' }, wins ? '우승 ' + wins + '개' : (n ? '결승 ' + n + '회' : ' ')));
     c.addEventListener('click', function () { pickSeason(s2.season); });
     rail.appendChild(c);
@@ -5541,6 +5564,126 @@ if (require.main === module) {
 }
 
 });</script>
+<script>NodeRun.define("nations.js", function (module, exports, require, process, console, Buffer) {
+
+"use strict";
+const fs = require("fs");
+const { when } = require("./honours.js");
+
+const WORLDCUP = {
+  1930: ["우루과이", "아르헨티나", "미국"], 1934: ["이탈리아", "체코슬로바키아", "독일"],
+  1938: ["이탈리아", "헝가리", "브라질"], 1950: ["우루과이", "브라질", "스웨덴"],
+  1954: ["서독", "헝가리", "오스트리아"], 1958: ["브라질", "스웨덴", "프랑스"],
+  1962: ["브라질", "체코슬로바키아", "칠레"], 1966: ["잉글랜드", "서독", "포르투갈"],
+  1970: ["브라질", "이탈리아", "서독"], 1974: ["서독", "네덜란드", "폴란드"],
+  1978: ["아르헨티나", "네덜란드", "브라질"], 1982: ["이탈리아", "서독", "폴란드"],
+  1986: ["아르헨티나", "서독", "프랑스"], 1990: ["서독", "아르헨티나", "이탈리아"],
+  1994: ["브라질", "이탈리아", "스웨덴"], 1998: ["프랑스", "브라질", "크로아티아"],
+  2002: ["브라질", "독일", "터키"], 2006: ["이탈리아", "프랑스", "독일"],
+  2010: ["스페인", "네덜란드", "독일"], 2014: ["독일", "아르헨티나", "네덜란드"],
+  2018: ["프랑스", "크로아티아", "벨기에"], 2022: ["아르헨티나", "프랑스", "크로아티아"],
+};
+const ASIANCUP = {
+  1956: ["대한민국", null, null], 1960: ["대한민국", null, null],
+  1968: ["이란", null, null], 1972: ["이란", "대한민국", null], 1976: ["이란", "쿠웨이트", null],
+  1980: ["쿠웨이트", "대한민국", null], 1984: ["사우디아라비아", null, null],
+  1988: ["사우디아라비아", "대한민국", null], 1992: ["일본", "사우디아라비아", null],
+  1996: ["사우디아라비아", null, null], 2000: ["일본", "사우디아라비아", null],
+  2004: ["일본", null, null], 2007: ["이라크", "사우디아라비아", null],
+  2011: ["일본", null, null], 2015: ["오스트레일리아", "대한민국", null],
+  2019: ["카타르", "일본", null],
+};
+const EURO = {
+  1964: ["스페인", null, null], 1968: ["이탈리아", null, null], 1972: ["서독", null, null],
+  1976: ["체코슬로바키아", "서독", null], 1980: ["서독", "벨기에", null],
+  1984: ["프랑스", "스페인", null], 1988: ["네덜란드", null, null],
+  1992: ["덴마크", "독일", null], 1996: ["독일", null, null],
+  2000: ["프랑스", "이탈리아", null], 2004: ["그리스", "포르투갈", null],
+  2008: ["스페인", "독일", null], 2012: ["스페인", "이탈리아", null],
+  2016: ["포르투갈", "프랑스", null], 2020: ["이탈리아", "잉글랜드", null],
+};
+
+const COPA = {
+  2021: ["아르헨티나", "브라질", null], 2019: ["브라질", "페루", null],
+  2016: ["칠레", "아르헨티나", null], 2015: ["칠레", "아르헨티나", null],
+  2011: ["우루과이", "파라과이", null], 2007: ["브라질", "아르헨티나", null],
+  2004: ["브라질", "아르헨티나", null], 2001: ["콜롬비아", "멕시코", null],
+  1999: ["브라질", "우루과이", null], 1997: ["브라질", "볼리비아", null],
+  1995: ["우루과이", "브라질", null], 1993: ["아르헨티나", "멕시코", null],
+  1991: ["아르헨티나", "브라질", null], 1989: ["브라질", "우루과이", null],
+  1987: ["우루과이", "칠레", null], 1983: ["우루과이", "브라질", null],
+  1979: ["파라과이", "칠레", null], 1975: ["페루", "콜롬비아", null],
+  1967: ["우루과이", "아르헨티나", null], 1963: ["볼리비아", "파라과이", null],
+};
+const BOOKS = [["월드컵", WORLDCUP], ["아시안컵", ASIANCUP], ["유로", EURO], ["코파 아메리카", COPA]];
+
+const H = 8, R = 55;
+
+function readComps(file) {
+  const b = fs.readFileSync(file);
+  const N = Math.floor((b.length - H) / R);
+  const by = new Map();
+  for (let i = 0; i < N; i++) {
+    const p = H + i * R, t = when(b, p);
+    if (!(t.end >= 1850 && t.end <= 2100)) continue;
+    const c = b.readUInt32LE(p);
+    if (!by.has(c)) by.set(c, new Map());
+    by.get(c).set(t.end, [8, 12, 16].map((o) => { const v = b.readUInt32LE(p + o); return v === 0xffffffff ? null : v; }));
+  }
+  return by;
+}
+
+function nations(file) {
+  const by = readComps(file);
+  const map = new Map(), found = [], drop = [];
+  for (const [label, book] of BOOKS) {
+    const years = Object.keys(book).map(Number);
+
+    let best = null;
+    for (const [c, m] of by) {
+      const hit = years.filter((y) => m.has(y)).length;
+      if (hit < Math.max(5, years.length * 0.6)) continue;
+      const local = new Map();
+      let clash = 0, votes = 0;
+      for (const y of years) {
+        const row = m.get(y); if (!row) continue;
+        book[y].forEach((nm, k) => {
+          if (!nm || row[k] == null) return;
+          votes++;
+          if (local.has(row[k]) && local.get(row[k]) !== nm) clash++;
+          local.set(row[k], nm);
+        });
+      }
+      if (clash) continue;
+
+      const repeat = votes - local.size;
+      if (repeat < 8) continue;
+      if (!best || repeat > best.repeat) best = { c, hit, local, votes, repeat };
+    }
+    if (!best) { drop.push(label + " — 모순 없이 맞는 대회가 없다"); continue; }
+    const local = best.local;
+    for (const [t, nm] of local) {
+      if (map.has(t) && map.get(t) !== nm) { drop.push(label + " — 앞 대회와 어긋난다: " + t); continue; }
+      map.set(t, nm);
+    }
+    found.push({ label, comp: best.c, hit: best.hit, of: years.length, names: local.size, repeat: best.repeat });
+  }
+  return { map, found, drop };
+}
+
+module.exports = { nations };
+
+if (require.main === module) {
+  const f = process.argv[2];
+  if (!f) { console.log("쓰기: node save/nations.js <comp_history_dt.cmt>"); process.exit(1); }
+  const { map, found, drop } = nations(f);
+  for (const x of found) console.log("  " + x.label + " = 대회 " + x.comp + " (연도 " + x.hit + "/" + x.of + " · 되풀이 " + x.repeat + ") → 나라 " + x.names + "개");
+  for (const d of drop) console.log("  ⚠ " + d);
+  console.log("\n대표팀 " + map.size + "개:");
+  for (const [t, nm] of [...map].sort((a, c) => a[0] - c[0])) console.log("  " + String(t).padStart(5) + "  " + nm);
+}
+
+});</script>
 <script>NodeRun.define("payload.js", function (module, exports, require, process, console, Buffer) {
 "use strict";
 
@@ -5675,7 +5818,16 @@ function build(cfg, log) {
     for (const s of SPELLS) if (s.from <= mark && (!s.until || mark < s.until)) return s.team;
     return null;
   };
-  const NAT = cfg.nations || {};
+
+  const NAT = Object.assign({}, (function () {
+    try {
+
+      const ch = (cfg.dumps || {}).compHistory;
+      if (!ch) return {};
+      const m = require("./save/nations.js").nations(R(ch)).map;
+      const o = {}; for (const [k, v] of m) o[k] = v; return o;
+    } catch (e) { console.error("⚠ 나라 이름 세우기 실패: " + e.message); return {}; }
+  })(), cfg.nations || {});
   const D = cfg.dumps || {};
   const CAPT = cfg.capture || {};
 
@@ -5998,7 +6150,9 @@ function build(cfg, log) {
     out.worldcup = [...byYear].filter(([, v]) => v.length === 2).sort((a, c) => a[0] - c[0])
       .map(([y, v]) => {
         const w = v.find((x) => x.f !== 3), l = v.find((x) => x.f === 3);
-        return { year: y, win: w ? w.t : null, winName: w ? (NAT[w.t] || null) : null,
+
+        const mine = meAt(y) === (w ? w.t : null) || meAt(y) === (l ? l.t : null);
+        return { year: y, mine: mine, win: w ? w.t : null, winName: w ? (NAT[w.t] || null) : null,
           lose: l ? l.t : null, loseName: l ? (NAT[l.t] || null) : null };
       });
     return out.worldcup.map((x) => x.year + ":" + (x.winName || x.win)).join(" ");
@@ -6020,7 +6174,9 @@ function build(cfg, log) {
 
     out.asiancup = [...by].filter(([s, v]) => s >= (cfg.asiancupFrom || FROM) && v.win)
       .sort((a, b) => a[0] - b[0])
-      .map(([s, v]) => ({ season: s, year: s + 1, win: v.win, winName: NAT[v.win] || null,
+
+      .map(([s, v]) => ({ season: s, year: s, mine: meAt(s) === v.win || meAt(s) === v.lose,
+        win: v.win, winName: NAT[v.win] || null,
         lose: v.lose, loseName: NAT[v.lose] || null }));
     return out.asiancup.map((x) => x.year + ":" + (x.winName || x.win)).join(" ");
   }, note);
