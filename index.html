@@ -1031,7 +1031,13 @@ function assemble({ entries, saves: rawSaves, backup, saveSquads, saveHistory, o
     const club = clubs[h.archiveClub];
     const label = "save-history/" + h.archiveClub;
     if (!club) { skipped.push({ file: label, reason: "아카이브에 없는 구단이다" }); continue; }
-    if (club.history) { skipped.push({ file: label, reason: "이 구단은 이미 연표가 있다" }); continue; }
+    const n = (h.seasons || []).length;
+    if (club.history) {
+      const 옛 = club.history.seasons.length, 옛날 = club.history.savedAt || "";
+      const 이김 = n > 옛 || (n === 옛 && (h.savedAt || "") > 옛날);
+      if (!이김) { skipped.push({ file: label, reason: "더 긴 연표가 이미 있다 (" + n + "시즌 ≤ " + 옛 + "시즌)" }); continue; }
+      skipped.push({ file: "save-history/" + h.archiveClub + "(옛것)", reason: "더 긴 연표로 바꿨다 (" + 옛 + " → " + n + "시즌)" });
+    }
     club.history = { savedAt: h.savedAt || null, clubNumber: h.club, seasons: h.seasons || [] };
   }
 
