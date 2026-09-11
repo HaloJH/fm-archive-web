@@ -5757,6 +5757,109 @@ if (require.main === module) {
 }
 
 });</script>
+<script>NodeRun.define("youth.js", function (module, exports, require, process, console, Buffer) {
+
+"use strict";
+const fs = require("fs");
+const path = require("path");
+
+const MARK = Buffer.from("01006c0701006c0700000000", "hex");
+const 큰번호 = 30000;
+const 문턱 = 3;
+
+function 짝모으기(gdbPath) {
+  const b = fs.readFileSync(gdbPath);
+  const out = [];
+  let st = -1;
+  for (let p = 0; p <= b.length; p++) {
+    const v = p < b.length ? b[p] : 0;
+    if (v >= 1 && v <= 100) { if (st < 0) st = p; continue; }
+    if (st >= 0 && p - st >= 56) {
+      const a = p - 54;
+      const seen = new Set();
+      for (let k = 0; k < 54; k++) seen.add(b[a + k]);
+      let ok = true;
+      for (let k = 0; k < 14; k++) { const q = a - 16 + k; if (q < 0 || b[q] > 20) { ok = false; break; } }
+      if (seen.size >= 4 && ok && a - 23 >= 0) {
+        const t = b.readUInt32LE(a - 23);
+        if (t > 50 && t < 100000) {
+          const w = b.subarray(a, Math.min(a + 1400, b.length));
+          const k = w.indexOf(MARK);
+          if (k >= 0) {
+            const o = b.readUInt32LE(a + k + 12);
+            if (o > 50 && o < 100000) out.push({ t: t, y: o - 1 });
+          }
+        }
+      }
+    }
+    st = -1;
+  }
+  return out;
+}
+
+function 표만들기(D, pts) {
+  let 짝;
+  if (pts && pts.length) {
+    짝 = pts.map((q) => ({ t: q.t, y: q.t + q.d }));
+  } else {
+    const g = path.join(D, "game_db.dat");
+    if (!fs.existsSync(g)) throw new Error("game_db.dat 이 없다: " + D);
+    짝 = 짝모으기(g);
+  }
+  const by = new Map();
+  for (const q of 짝) {
+    if (!by.has(q.y)) by.set(q.y, new Map());
+    const m = by.get(q.y);
+    m.set(q.t, (m.get(q.t) || 0) + 1);
+  }
+  return { by: by, 짝: 짝 };
+}
+
+function 유스팀(표, 구단표id) {
+  const m = 표.by.get(Number(구단표id));
+  if (!m) return null;
+  const 큰 = [...m].filter(([t, n]) => t > 큰번호 && n >= 문턱).sort((x, z) => z[1] - x[1]);
+  if (큰.length < 2) return null;
+  const 쌍 = [큰[0][0], 큰[1][0]].sort((x, z) => x - z);
+  return { teams: 쌍, 붙음: 쌍[1] - 쌍[0] === 1, 근거: [큰[0][1], 큰[1][1]] };
+}
+
+function 검산(표) {
+  const 큰팀 = [...new Set(표.짝.filter((q) => q.t > 큰번호).map((q) => q.t))];
+  const S = new Set(큰팀);
+  let 이웃 = 0;
+  for (const t of 큰팀) if (S.has(t + 1)) 이웃++;
+  const 영가설 = 이웃 / (큰팀.length * (큰팀.length - 1) / 2);
+  let 답 = 0, 붙 = 0;
+  const 쓴 = new Map();
+  for (const 표id of 표.by.keys()) {
+    const r = 유스팀(표, 표id);
+    if (!r) continue;
+    답++; if (r.붙음) 붙++;
+    for (const t of r.teams) 쓴.set(t, (쓴.get(t) || 0) + 1);
+  }
+  return { 답: 답, 붙: 붙, 겹침: [...쓴.values()].filter((x) => x > 1).length,
+           영가설: 영가설, 큰팀수: 큰팀.length };
+}
+
+module.exports = { 유스팀, 표만들기, 검산, 문턱 };
+
+if (require.main === module) {
+  const D = process.argv[2], 표id = process.argv[3];
+  if (!D) { console.log("쓰기: node --max-old-space-size=8000 save/youth.js <덤프폴더> [구단표id]"); process.exit(1); }
+  const 표 = 표만들기(D);
+  const c = 검산(표);
+  console.log(path.basename(D) + " — 짝 " + 표.짝.length.toLocaleString() + "개 · 30000+ 팀 " + c.큰팀수 + "개");
+  console.log("  답한 구단 " + c.답 + " · ±1 붙음 " + c.붙 + " (" + (100 * c.붙 / Math.max(1, c.답)).toFixed(0) +
+    "%) · 겹침 " + c.겹침 + "   영가설 " + (100 * c.영가설).toFixed(3) + "%");
+  if (표id) {
+    const r = 유스팀(표, 표id);
+    console.log("  구단표 " + 표id + " → " + (r ? r.teams.join(" · ") + "  (근거 " + r.근거.join("·") + "명" +
+      (r.붙음 ? " · ±1 붙음" : " · ⚠ 안 붙음") + ")" : "모름 — 근거가 " + 문턱 + "명에 못 미친다"));
+  }
+}
+
+});</script>
 <script>NodeRun.define("payload.js", function (module, exports, require, process, console, Buffer) {
 "use strict";
 
@@ -5905,6 +6008,15 @@ function build(cfg, log) {
   })(), cfg.nations || {});
   const D = cfg.dumps || {};
   const CAPT = cfg.capture || {};
+
+  let _mp = null, _mpDone = false;
+  const MAPPER = () => {
+    if (_mpDone) return _mp;
+    _mpDone = true;
+    try { _mp = require(path.join(AR, "save", "clubmap.js")).buildMapper(R(D.clubmapDir), cfg.clubmapYear); }
+    catch (e) { say("  구단 이름표 실패: " + e.message); _mp = null; }
+    return _mp;
+  };
 
   let capOK = false;
   const note = { ok: [], skip: [], warn: [] };
@@ -6061,7 +6173,7 @@ function build(cfg, log) {
 
     let nameOf = () => null;
     try {
-      const mp = require(path.join(AR, "save", "clubmap.js")).buildMapper(R(D.clubmapDir), cfg.clubmapYear);
+      const mp = MAPPER();
       if (mp && mp.clubOf) nameOf = (t) => { const r = mp.clubOf(t);
         return r && r.name ? { name: r.name, conf: r.tot ? +(r.n / r.tot).toFixed(2) : null } : null; };
     } catch (e) { say("  구단 이름 추정 실패: " + e.message); }
@@ -6134,10 +6246,25 @@ function build(cfg, log) {
     return "단조 감소 " + ok + " · 어긋남 " + bad + " (" + (100 * ok / (ok + bad)).toFixed(1) + "%)";
   }, note);
 
+  let TEAMS = (cfg.teams && cfg.teams.length) ? cfg.teams.slice() : [ME];
+  part("⑥-0′ 유스팀 번호", () => {
+    if (cfg.teams && cfg.teams.length) return "설정이 준 것을 쓴다 — " + cfg.teams.join(" · ");
+    const mp = MAPPER();
+    if (!mp) throw new Error("이름표가 없어 구단표 id 를 모른다");
+    const me = mp.clubOf(ME);
+    if (!me || me.tableId == null) throw new Error("1군(" + ME + ")의 구단표 id 를 모른다");
+    const Y = require(path.join(AR, "save", "youth.js"));
+    const r = Y.유스팀(Y.표만들기(null, mp.pts), me.tableId);
+    if (!r) throw new Error("근거가 모자라다 (구단표 " + me.tableId + ")");
+    TEAMS = [ME].concat(r.teams);
+    out.teams = { first: ME, youth: r.teams, 근거: r.근거, 붙음: r.붙음, 구단표: me.tableId };
+    return "구단표 " + me.tableId + " → " + r.teams.join(" · ") + "  (근거 " + r.근거.join("·") +
+      "명" + (r.붙음 ? " · ±1 붙음" : " · ⚠ 안 붙음") + ")";
+  }, note);
+
   part("⑥-0 명예의 전당(세이브)", () => {
     const f = NEED(D.compHistory, "대회 이력(dumps.compHistory)");
-    const teams = (cfg.teams && cfg.teams.length) ? cfg.teams : [ME];
-    const h = require("./save/honours.js").honours(f, teams);
+    const h = require("./save/honours.js").honours(f, TEAMS);
     let NAME = new Map();
     const nd = (D.news || []).map((p) => R(p)).filter((p) => p && fs.existsSync(p));
     if (nd.length) { try { NAME = require("./save/compnames.js").readAll(nd).map; } catch (e) {   } }
@@ -6285,7 +6412,8 @@ function build(cfg, log) {
   }
   if (cfg.club.uid == null && CLUB == null) {
     part("⑨-0 수상 구단 번호 유도", () => {
-      const mp = require(path.join(AR, "save", "clubmap.js")).buildMapper(NEED(D.clubmapDir, "이름표 폴더(dumps.clubmapDir)"), cfg.clubmapYear);
+      const mp = MAPPER();
+      if (!mp) throw new Error("이름표 폴더(dumps.clubmapDir)가 없다");
       const r = mp && mp.clubOf ? mp.clubOf(ME) : null;
       if (!r || !(r.full || r.name)) throw new Error("기록표 번호 " + ME + " 에 구단 이름을 못 붙였다");
       const nm = r.full || r.name;
