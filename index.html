@@ -5860,6 +5860,127 @@ if (require.main === module) {
 }
 
 });</script>
+<script>NodeRun.define("bridge.js", function (module, exports, require, process, console, Buffer) {
+
+"use strict";
+const fs = require("fs");
+const { when } = require("./honours.js");
+
+const CR = 55, CH = 8;
+const UR = 18, UH = 8;
+
+function 읽기_대회(file) {
+  const b = fs.readFileSync(file);
+  const 정답 = new Map(), 있는시즌 = new Map();
+  const N = Math.floor((b.length - CH) / CR);
+  for (let i = 0; i < N; i++) {
+    const p = CH + i * CR, t = when(b, p);
+    if (!(t.end >= 2000 && t.end <= 2100) || !t.ingame) continue;
+    const c = b.readUInt32LE(p), w = b.readUInt32LE(p + 8), l = b.readUInt32LE(p + 12);
+    정답.set(t.start + "|" + c, { w: w, l: l === 0xffffffff ? null : l });
+    if (!있는시즌.has(c)) 있는시즌.set(c, new Set());
+    있는시즌.get(c).add(t.start);
+  }
+  return { 정답, 있는시즌 };
+}
+
+function 읽기_컵(file) {
+  const b = fs.readFileSync(file);
+  const m = new Map();
+  const N = Math.floor((b.length - UH) / UR);
+  for (let i = 0; i < N; i++) {
+    const p = UH + i * UR;
+    const r = b.readUInt32LE(p), s = b.readUInt16LE(p + 4);
+    if (!(s >= 2000 && s <= 2100)) continue;
+    const k = s + "|" + r;
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push({ t: b.readUInt32LE(p + 14), f: b[p + 8] });
+  }
+  return m;
+}
+
+function 배우기(정답, 라운드) {
+  const 후보 = new Map();
+  for (const [k, v] of 라운드) {
+    if (v.length !== 2) continue;
+    const s = k.split("|")[0], r = k.split("|")[1];
+    for (const [key, ans] of 정답) {
+      const i = key.indexOf("|");
+      if (key.slice(0, i) !== s || ans.l == null) continue;
+      const a = v.find((x) => x.t === ans.w), b2 = v.find((x) => x.t === ans.l);
+      if (!a || !b2 || a === b2 || a.f === b2.f) continue;
+      if (!후보.has(r)) 후보.set(r, new Map());
+      const m = 후보.get(r), kk = key.slice(i + 1) + "|" + a.f;
+      m.set(kk, (m.get(kk) || 0) + 1);
+    }
+  }
+  const 다리 = new Map();
+  let 약함 = 0;
+  for (const [r, m] of 후보) {
+    const s = [...m].sort((a, b) => b[1] - a[1]);
+    const 총 = [...m.values()].reduce((x, y) => x + y, 0);
+    if (s[0][1] >= 3 && s[0][1] / 총 > 0.5) {
+      const g = s[0][0].split("|");
+      다리.set(r, { c: Number(g[0]), 우승깃발: Number(g[1]), 표: s[0][1], 총: 총 });
+    } else 약함++;
+  }
+  return { 다리, 약함 };
+}
+
+function 검산(정답, 라운드, 다리) {
+  let 맞 = 0, 틀 = 0;
+  const 틀린곳 = new Map();
+  for (const [k, v] of 라운드) {
+    if (v.length !== 2) continue;
+    const s = k.split("|")[0], r = k.split("|")[1];
+    const br = 다리.get(r); if (!br) continue;
+    const ans = 정답.get(s + "|" + br.c); if (!ans || ans.l == null) continue;
+    const 뽑은 = v.find((x) => x.f === br.우승깃발);
+    const 진 = v.find((x) => x !== 뽑은);
+    if (!뽑은 || !진) continue;
+    if (뽑은.t === ans.w && 진.t === ans.l) 맞++;
+    else { 틀++; 틀린곳.set(r + "/" + br.c, (틀린곳.get(r + "/" + br.c) || 0) + 1); }
+  }
+  return { 맞, 틀, 틀린곳: [...틀린곳].sort((a, b) => b[1] - a[1]) };
+}
+
+function 채우기(라운드, 다리, 있는시즌, 팀들) {
+  const 우리 = new Set(팀들.map(Number));
+  const out = [];
+  for (const [k, v] of 라운드) {
+    if (v.length !== 2) continue;
+    const s = Number(k.split("|")[0]), r = k.split("|")[1];
+    const br = 다리.get(r); if (!br) continue;
+    const me = v.find((x) => 우리.has(x.t)); if (!me) continue;
+    if ((있는시즌.get(br.c) || new Set()).has(s)) continue;
+    out.push({ comp: br.c, season: s, win: me.f === br.우승깃발, team: me.t, round: Number(r) });
+  }
+  return out.sort((a, b) => a.season - b.season || a.comp - b.comp);
+}
+
+module.exports = { 읽기_대회, 읽기_컵, 배우기, 검산, 채우기 };
+
+if (require.main === module) {
+  const [, , cf, uf, ...ts] = process.argv;
+  if (!cf || !uf) { console.log("쓰기: node save/bridge.js <comp_history.cmt> <tc_cup_history.cmt> [팀번호…]"); process.exit(1); }
+  const { 정답, 있는시즌 } = 읽기_대회(cf);
+  const 라운드 = 읽기_컵(uf);
+  const { 다리, 약함 } = 배우기(정답, 라운드);
+  console.log("다리 " + 다리.size + "개 · 표가 약해 버린 것 " + 약함 + "개");
+  const c = 검산(정답, 라운드, 다리);
+  console.log("검산 — 아는 시즌에서 우승자 맞히기: 맞 " + c.맞 + " · 틀 " + c.틀 +
+    " (" + (100 * c.맞 / (c.맞 + c.틀)).toFixed(1) + "%)");
+  if (c.틀린곳.length) console.log("  틀림이 몰린 곳: " + c.틀린곳.slice(0, 4).map((x) => x[0] + "×" + x[1]).join(" · "));
+  const 팀 = (ts.join(",").split(",").filter(Boolean));
+  if (팀.length) {
+    const rows = 채우기(라운드, 다리, 있는시즌, 팀);
+    console.log("\ncomp_history 가 모르는 트로피 " + rows.length + "건:");
+    for (const x of rows) console.log("   " + x.season + "-" + String(x.season + 1).slice(2) + "  " +
+      (x.win ? "우승  " : "준우승") + "  대회 " + x.comp + (x.team !== Number(팀[0]) ? "  (유스 " + x.team + ")" : ""));
+  }
+}
+
+});</script>
 <script>NodeRun.define("payload.js", function (module, exports, require, process, console, Buffer) {
 "use strict";
 
@@ -6282,6 +6403,34 @@ function build(cfg, log) {
       }))
       .sort((a, c) => c.win.length - a.win.length || a.comp - c.comp);
     if (!rows.length) throw new Error("이 팀 번호로는 명예의 전당이 비어 있다");
+
+    try {
+      const BR = require(path.join(AR, "save", "bridge.js"));
+      const uf = R(D.cup);
+      if (uf && fs.existsSync(uf)) {
+        const { 정답, 있는시즌 } = BR.읽기_대회(R(f));
+        const 컵 = BR.읽기_컵(uf);
+        const { 다리 } = BR.배우기(정답, 컵);
+        const ck = BR.검산(정답, 컵, 다리);
+        const byComp = new Map(rows.map((r) => [r.comp, r]));
+        let 채움 = 0, 버림 = 0;
+        for (const x of BR.채우기(컵, 다리, 있는시즌, TEAMS)) {
+          const row = byComp.get(x.comp);
+          if (!row) { 버림++; continue; }
+
+          const y = row.summer ? x.season : x.season + 1;
+          const 칸 = x.win ? row.win : row.lose;
+          if (칸.indexOf(y) >= 0) continue;
+          칸.push(y); 칸.sort((a, b) => a - b);
+          (row.fromBridge = row.fromBridge || []).push(y);
+          채움++;
+        }
+        out.bridge = { 다리: 다리.size, 맞: ck.맞, 틀: ck.틀, 채움: 채움, 버림: 버림 };
+        say("  다리로 채운 트로피 " + 채움 + "건 (없던 대회라 버림 " + 버림 + ") · 다리 검산 " +
+          ck.맞 + "/" + (ck.맞 + ck.틀) + " " + (100 * ck.맞 / (ck.맞 + ck.틀)).toFixed(1) + "%");
+      }
+    } catch (e) { say("  ⚠ 라운드→대회 다리 실패: " + e.message); }
+
     out.honours = rows;
     const named = rows.filter((r) => r.name).length;
     return "대회 " + rows.length + "종 · 우승 " + rows.reduce((n, r) => n + r.win.length, 0) +
