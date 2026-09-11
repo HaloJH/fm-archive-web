@@ -5617,6 +5617,64 @@ const COPA = {
 };
 const BOOKS = [["월드컵", WORLDCUP], ["아시안컵", ASIANCUP], ["유로", EURO], ["코파 아메리카", COPA]];
 
+const CONMEBOL = ["아르헨티나", "볼리비아", "브라질", "칠레", "콜롬비아",
+                  "에콰도르", "파라과이", "페루", "우루과이", "베네수엘라"];
+
+const EN = {
+  "그리스": "Greece", "네덜란드": "Netherlands", "대한민국": "South Korea", "덴마크": "Denmark",
+  "독일": "Germany", "멕시코": "Mexico", "미국": "United States", "벨기에": "Belgium",
+  "볼리비아": "Bolivia", "브라질": "Brazil", "사우디아라비아": "Saudi Arabia", "서독": "West Germany",
+  "스웨덴": "Sweden", "스페인": "Spain", "아르헨티나": "Argentina", "에콰도르": "Ecuador",
+  "오스트레일리아": "Australia", "오스트리아": "Austria", "우루과이": "Uruguay",
+  "우즈베키스탄": "Uzbekistan", "이라크": "Iraq", "이란": "Iran", "이탈리아": "Italy",
+  "일본": "Japan", "잉글랜드": "England", "체코슬로바키아": "Czechoslovakia",
+  "카타르": "Qatar", "칠레": "Chile", "콜롬비아": "Colombia", "쿠웨이트": "Kuwait",
+  "크로아티아": "Croatia", "터키": "Turkey", "파라과이": "Paraguay", "페루": "Peru",
+  "포르투갈": "Portugal", "폴란드": "Poland", "프랑스": "France", "헝가리": "Hungary",
+  "베네수엘라": "Venezuela",
+};
+
+const 화면에서 = { 126: "우즈베키스탄" };
+
+function 남미채우기(map) {
+  const 표 = [];
+  for (const [t, nm] of map) {
+    const r = CONMEBOL.indexOf(nm);
+    if (r >= 0) 표.push({ t: Number(t), r: r, nm: nm });
+  }
+  if (표.length < 3) return { added: [], why: "남미 앵커가 " + 표.length + "개뿐 — 셋은 있어야 건다" };
+  const 시작 = [...new Set(표.map((x) => x.t - x.r))];
+  if (시작.length !== 1) {
+    return { added: [], why: "앵커들이 시작번호를 " + 시작.join("/") + " 로 달리 가리킨다 — 안 채운다" };
+  }
+  const b = 시작[0], added = [];
+  CONMEBOL.forEach((nm, r) => {
+    if (map.has(b + r)) return;
+    map.set(b + r, nm);
+    added.push({ t: b + r, nm: nm });
+  });
+  return { added, why: "앵커 " + 표.length + "개가 모두 시작번호 " + b + " 로 모인다" };
+}
+
+function 순서검산(map, 틈 = 60) {
+  const rows = [...map].map(([t, nm]) => ({ t: Number(t), nm })).sort((a, b) => a.t - b.t);
+  const 덩이 = [];
+  for (const r of rows) {
+    if (!덩이.length || r.t - 덩이[덩이.length - 1][덩이[덩이.length - 1].length - 1].t > 틈) 덩이.push([]);
+    덩이[덩이.length - 1].push(r);
+  }
+  const 경고 = [];
+  for (const g of 덩이) {
+    if (g.length < 2) continue;
+    for (let i = 0; i + 1 < g.length; i++) {
+      const a = EN[g[i].nm], b = EN[g[i + 1].nm];
+      if (!a || !b) continue;
+      if (a > b) 경고.push(g[i].t + " " + a + " 다음이 " + g[i + 1].t + " " + b + " — 알파벳 순서가 거꾸로다");
+    }
+  }
+  return { 덩이수: 덩이.length, 경고 };
+}
+
 const H = 8, R = 55;
 
 function readComps(file) {
@@ -5668,17 +5726,26 @@ function nations(file) {
     }
     found.push({ label, comp: best.c, hit: best.hit, of: years.length, names: local.size, repeat: best.repeat });
   }
-  return { map, found, drop };
+
+  const 채움 = 남미채우기(map);
+
+  for (const [t, nm] of Object.entries(화면에서)) if (!map.has(Number(t))) map.set(Number(t), nm);
+
+  const 검산 = 순서검산(map);
+  return { map, found, drop, 채움, 검산 };
 }
 
-module.exports = { nations };
+module.exports = { nations, 남미채우기, 순서검산, EN, CONMEBOL };
 
 if (require.main === module) {
   const f = process.argv[2];
   if (!f) { console.log("쓰기: node save/nations.js <comp_history_dt.cmt>"); process.exit(1); }
-  const { map, found, drop } = nations(f);
+  const { map, found, drop, 채움, 검산 } = nations(f);
   for (const x of found) console.log("  " + x.label + " = 대회 " + x.comp + " (연도 " + x.hit + "/" + x.of + " · 되풀이 " + x.repeat + ") → 나라 " + x.names + "개");
   for (const d of drop) console.log("  ⚠ " + d);
+  console.log("  남미 번호규칙: " + 채움.why + (채움.added.length ? " → " + 채움.added.map((a) => a.t + " " + a.nm).join(", ") : " → 더 붙은 것 없음"));
+  console.log("  순서검산: 덩이 " + 검산.덩이수 + "개 · 어긋남 " + 검산.경고.length + "건");
+  for (const w of 검산.경고) console.log("    ✗ " + w);
   console.log("\n대표팀 " + map.size + "개:");
   for (const [t, nm] of [...map].sort((a, c) => a[0] - c[0])) console.log("  " + String(t).padStart(5) + "  " + nm);
 }
@@ -5788,7 +5855,9 @@ function scanPeople(file) {
     if (q < 0) continue;
     const u2 = g.readUInt32LE(q + 5); if (u2 === 0xffffffff || u2 === 0) continue;
     if (!m.has(u2)) m.set(u2, []);
-    m.get(u2).push({ id: id, born: born, full: full, sur: g.readUInt32LE(at + 34) });
+
+    m.get(u2).push({ id: id, born: born, full: full, sur: g.readUInt32LE(at + 34),
+                     loc: g.readUInt32LE(at + 39) });
   }
   return m;
 }
@@ -6240,17 +6309,28 @@ function build(cfg, log) {
     const u = peopleUnion(gdbs);
     PEOPLE = u.by;
 
-    let NAMES = new Map(), DICT = new Map();
-    try { NAMES = require(path.join(AR, "save", "names.js")).build(AR, { club: cfg.club.name }); } catch (e) {}
-    try { DICT = require(path.join(AR, "save", "names.js")).dictionary(fs.readFileSync(gdbs[0])); } catch (e) {}
+    let NAMES = new Map(), DICT = new Map(), LOCAL = new Map();
+    const NM = require(path.join(AR, "save", "names.js"));
+    const g0 = fs.readFileSync(gdbs[0]);
+
+    let 탈 = [];
+
+    if (cfg.club.name) {
+      try { NAMES = NM.build(AR, { club: cfg.club.name }); } catch (e) { 탈.push("내보내기 다리:" + e.message); }
+    } else { 탈.push("내보내기 다리: 구단 이름이 없어 안 놓음(커리어가 섞인다)"); }
+    try { DICT = NM.dictionary(g0); } catch (e) { 탈.push("성 사전:" + e.message); }
+
+    try { LOCAL = NM.localNames(g0); } catch (e) { 탈.push("표시 이름 사전:" + e.message); }
+
     NAMEOF = (u2) => {
       const p = PEOPLE.get(u2); if (!p) return null;
       const n = p.id != null ? NAMES.get(p.id) : null;
-      return (n && (n.localName || n.fullName || n.name)) || p.full || DICT.get(p.sur) ||
-        (p.id != null ? "사람" + p.id : null);
+      return (n && (n.localName || n.fullName || n.name)) || LOCAL.get(p.loc) || p.full ||
+        DICT.get(p.sur) || (p.id != null ? "사람" + p.id : null);
     };
     return "UID2→사람 " + PEOPLE.size + " (덤프 " + gdbs.length + "개 합집합 · 애매한 " + u.dropped +
-      "개 버림) · 상 이름 " + Object.keys(AWARD).length + "종";
+      "개 버림) · 상 이름 " + Object.keys(AWARD).length + "종 · 이름 원천 [내보내기 " + NAMES.size +
+      " · 표시이름 " + LOCAL.size + " · 성 " + DICT.size + "]" + (탈.length ? " ⚠ " + 탈.join(" / ") : "");
   }, note);
 
   part("⑨ 수상", () => {
