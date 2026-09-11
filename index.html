@@ -3115,7 +3115,11 @@ const FOEOF = (t) => { const v = t ? FOEMAP.get(t) : null; return v && v.conf >=
     const d = el("div");
 
     const nm = c.name || ("대회 " + c.comp);
-    const pic = (D.cupPix || {})[c.name];
+
+    const G = D.trophyPix || null;
+    const gen = !G ? null : c.kind === "league" ? (G.league || G.cup)
+      : c.summer ? (G.plate || G.cup) : (G.cup || G.plate);
+    const pic = (D.cupPix || {})[c.name] || gen;
     if (pic) {
       const im = el("img", { class: "cupimg", src: pic, alt: nm + " 트로피", loading: "lazy" });
       d.appendChild(im);
@@ -4684,7 +4688,8 @@ if (require.main === module) {
 const fs = require("fs");
 const path = require("path");
 
-const MIN = 10;
+const MIN = 8;
+const MINR = 0.15;
 
 function buildMapper(D, NOW) {
 const GDB = path.join(D, "game_db.dat"), CLB = path.join(D, "clubs.json");
@@ -4748,7 +4753,7 @@ function estimate(t) {
 
 function clubOf(t) {
   const e = estimate(t);
-  if (!e || e.n < MIN) return null;
+  if (!e || e.n < MIN || e.n / e.tot < MINR) return null;
   const id = t + e.d, c = clubs.get(id);
   return { team: t, tableId: id, name: c ? (c.full || c.short) : null, n: e.n, tot: e.tot };
 }
@@ -4774,7 +4779,8 @@ if (one >= 0) {
   const t = Number(argv[one + 1]);
   const r = clubOf(t);
   console.log(r ? "팀 " + t + " → 구단표 " + r.tableId + "  " + (r.name || "(이름 없음)") +
-                  "   근거 " + r.n + "/" + r.tot : "팀 " + t + " → 모름 (근거가 " + MIN + "건에 못 미친다)");
+                  "   근거 " + r.n + "/" + r.tot + " (" + (100 * r.n / r.tot).toFixed(0) + "%)" :
+                  "팀 " + t + " → 모름 (근거가 " + MIN + "건 또는 " + (MINR * 100) + "% 에 못 미친다)");
   process.exit(0);
 }
 
@@ -5475,12 +5481,17 @@ function honours(file, teams) {
   const b = fs.readFileSync(file);
   const N = Math.floor((b.length - HEAD) / R);
   const out = new Map();
+
+  const kindOf = new Map();
   const get = (c) => { if (!out.has(c)) out.set(c, { win: new Set(), lose: new Set(), third: new Set(), summer: new Set(), by: new Map() }); return out.get(c); };
   for (let i = 0; i < N; i++) {
     const p = HEAD + i * R;
     const t = when(b, p);
     if (!(t.end >= 1850 && t.end <= 2100)) continue;
     const c = b.readUInt32LE(p);
+    if (!kindOf.has(c)) kindOf.set(c, { n: 0, third: 0 });
+    const k = kindOf.get(c); k.n++;
+    if (b.readUInt32LE(p + 16) !== 0xffffffff) k.third++;
 
     for (const [k, kind] of [[8, "win"], [12, "lose"], [16, "third"]]) {
       const v = b.readUInt32LE(p + k);
@@ -5496,6 +5507,7 @@ function honours(file, teams) {
     const s = [...e.summer];
     fin.set(c, { win: [...e.win].sort((x, y) => x - y), lose: [...e.lose].sort((x, y) => x - y),
       third: [...e.third].sort((x, y) => x - y), by: e.by,
+      kind: (() => { const k = kindOf.get(c); return k && k.n ? (k.third / k.n >= 0.5 ? "league" : "cup") : null; })(),
       summer: s.length === 1 ? s[0] : null });
   }
   return fin;
@@ -5519,7 +5531,8 @@ if (require.main === module) {
   console.log("팀 " + team + " 의 명예의 전당 — 대회 " + rows.length + "종\n");
   for (const [c, e] of rows) {
     const nm = NAME.get(c) ? NAME.get(c).name : "대회 " + c;
-    console.log("  " + nm + (e.summer === null ? "" : e.summer ? "  (여름 결승)" : "  (봄 결승)"));
+    console.log("  " + nm + (e.kind ? "  [" + (e.kind === "league" ? "리그" : "컵") + "]" : "") +
+      (e.summer === null ? "" : e.summer ? "  (여름 결승)" : "  (봄 결승)"));
     if (e.win.length) console.log("      우승 " + e.win.length + "회 — " + e.win.join(" "));
     if (e.lose.length) console.log("      준우승 " + e.lose.length + "회 — " + e.lose.join(" "));
     if (e.third.length) console.log("      3위 " + e.third.length + "회 — " + e.third.join(" "));
@@ -5908,6 +5921,7 @@ function build(cfg, log) {
         short: NAME.get(comp) ? NAME.get(comp).short : null,
         win: e.win, lose: e.lose, third: e.third,
         summer: e.summer,
+        kind: e.kind,
         teams: [...new Set([...e.by.values()])],
 
         youth: ![...e.by.values()].includes(ME),
@@ -6596,7 +6610,8 @@ async function buildCareer(pt, say) {
       stats: at["player_stats_hist_dt"], manager: at["person_record_manager"],
       award: at["award_year_hist_dt"],
       compHistory: at["comp_history_dt"] || null,
-      news: at["news"] ? [at["news"]] : [],
+
+      news: [at["news"], at["play_fixture_manager"]].concat(at.matchFiles || []).filter(Boolean),
       gameDb: at.gameDb ? [at.gameDb] : [],
       clubmapDir: at.gameDb ? "/save" : null,
       clubsJson: at.gameDb ? "/save/clubs.json" : null,
@@ -6695,12 +6710,15 @@ async function grabSections(file, say, journey) {
   const at = {};
 
   const WANT = ["person_record_manager", "player_stats_hist_dt", "tc_league_history_dt",
-                "tc_cup_history_dt", "award_year_hist_dt", "comp_history_dt", "news", "game_db"];
+                "tc_cup_history_dt", "award_year_hist_dt", "comp_history_dt", "news",
+                "play_fixture_manager", "game_db"];
   let total = TAIL, done = TAIL;
   for (const n of WANT) {
     const e = idx.entries.find((x) => x.name === n);
     if (e) total += e.stored;
   }
+
+  for (const e of idx.entries.filter((x) => /^d+_d+/.test(x.name)).slice(0, 120)) total += e.stored;
   if (say.bytes) say.bytes(done, total);
 
   const grab = async (name) => {
@@ -6733,7 +6751,14 @@ async function grabSections(file, say, journey) {
     at[n] = v;
   }
 
-  for (const n of ["comp_history_dt", "news"]) { const v = await grab(n); if (v) at[n] = v; }
+  for (const n of ["comp_history_dt", "news", "play_fixture_manager"]) { const v = await grab(n); if (v) at[n] = v; }
+
+  at.matchFiles = [];
+  const matches = idx.entries.filter((e) => /^d+_d+/.test(e.name)).slice(0, 120);
+  if (matches.length) {
+    say("대회 이름 모으는 중 — 경기 파일 " + matches.length + "개");
+    for (const e of matches) { const v = await grab(e.name); if (v) at.matchFiles.push(v); }
+  }
   at.gameDb = await grab("game_db");
   if (at.gameDb) {
     say("이름표 만드는 중");
@@ -7039,7 +7064,7 @@ function deepRender(res) {
 const SPA_NEED = ["person_record_manager", "player_stats_hist_dt", "tc_league_history_dt",
   "tc_cup_history_dt", "award_year_hist_dt"];
 
-const SPA_WANT = ["comp_history_dt", "news"];
+const SPA_WANT = ["comp_history_dt", "news", "play_fixture_manager"];
 
 async function spaBuild(file, wantNames, say) {
   const parse = REG["parse.js"], Bytes = REG["platform-web.js"].Bytes;
@@ -7072,6 +7097,10 @@ async function spaBuild(file, wantNames, say) {
     at[name] = g.path; mb += g.mb;
   }
   for (const name of SPA_WANT) { const g = await grab(name); if (g) { at[name] = g.path; mb += g.mb; } }
+  at.matchFiles = [];
+  for (const e of idx.entries.filter((x) => /^d+_d+/.test(x.name)).slice(0, 120)) {
+    const g = await grab(e.name); if (g) { at.matchFiles.push(g.path); mb += g.mb; }
+  }
 
   let gdb = null;
   if (wantNames) {
@@ -7123,7 +7152,8 @@ async function spaBuild(file, wantNames, say) {
       manager: at["person_record_manager"],
       award: at["award_year_hist_dt"],
       compHistory: at["comp_history_dt"] || null,
-      news: at["news"] ? [at["news"]] : [],
+
+      news: [at["news"], at["play_fixture_manager"]].concat(at.matchFiles || []).filter(Boolean),
       gameDb: gdb ? [gdb] : [],
       clubmapDir: gdb ? "/save" : null,
       clubsJson: gdb ? "/save/clubs.json" : null,
