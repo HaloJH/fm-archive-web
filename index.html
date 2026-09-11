@@ -111,6 +111,20 @@ h1{font-size:28px; letter-spacing:-.02em; margin:0 0 6px}
   padding:6px 12px; border-radius:8px; font-size:14px; font-family:inherit}
 .back:hover{border-color:var(--accent); color:var(--accent)}
 #aframe{flex:1; width:100%; border:0; background:var(--bg)}
+/* ★ 111: 세이브 깊이 읽기 — 자리·생김새는 아직 결정거리다. 여기서는 읽히기만 하면 된다. */
+.deepbox{margin:22px 0 0;padding:16px 18px;background:var(--panel);border:1px solid var(--line);border-radius:6px}
+.deepbox h3{margin:0 0 6px;font-size:15px}
+.deepbox h3 small,.deepbox h4 small{font-weight:400;color:var(--ink-3);font-size:12px;margin-left:6px}
+.deepbox h4{margin:16px 0 6px;font-size:14px}
+.deepbtn{margin:6px 6px 0 0;padding:7px 12px;border:1px solid var(--line);border-radius:4px;background:var(--bg);cursor:pointer;font:inherit;font-size:13px}
+.deepbtn:hover:not(:disabled){border-color:var(--ink)}
+.deepbtn:disabled{opacity:.5;cursor:default}
+#deeplog{margin:8px 0 0;min-height:1.2em}
+.tblwrap{overflow-x:auto}
+table.deept{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+table.deept th{text-align:left;font-weight:500;color:var(--ink-3);padding:4px 8px;border-bottom:1px solid var(--line);font-size:12px}
+table.deept td{padding:4px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.deept td.dim{color:var(--ink-3);white-space:normal}
 </style>
 
 
@@ -152,6 +166,9 @@ h1{font-size:28px; letter-spacing:-.02em; margin:0 0 6px}
     <p id="elapsed"></p>
     <div id="warn" hidden></div>
     <div id="list"></div>
+    <!-- ★ 111: 세이브 깊이 읽기. 내보내기가 없어도 여기까지는 나온다.
+         ⚠ 자리와 생김새는 아직 정하지 않았다 — 결정거리(BACKLOG) -->
+    <div id="deep"></div>
   </section>
 
 </div>
@@ -459,8 +476,14 @@ function readArchive(data, label) {
 
   const at = data.lastIndexOf(ZSTD_MAGIC);
   if (at < 0) throw new Error("인덱스를 찾을 수 없음: " + (label || ""));
-  const index = P.zstdDecompress(data.slice(at));
+  const { root, entries } = parseIndex(P.zstdDecompress(data.slice(at)));
+  for (const e of entries)
 
+    e.buffer = encrypted ? null : data.slice(HEADER_SIZE + e.offset, HEADER_SIZE + e.offset + e.stored);
+  return { root, encrypted, entries };
+}
+
+function parseIndex(index) {
   let p = 0;
   const u32 = () => { const v = index.readUInt32LE(p); p += 4; return v; };
   const u64 = () => { const v = Number(index.readBigUInt64LE(p)); p += 8; return v; };
@@ -473,13 +496,16 @@ function readArchive(data, label) {
     const name = str(), ext = str();
     const offset = u64(), stored = u64(), plain = u64();
     u64(); u64();
-    entries.push({
-      name, ext, offset, stored, plain,
-
-      buffer: encrypted ? null : data.slice(HEADER_SIZE + offset, HEADER_SIZE + offset + stored),
-    });
+    entries.push({ name, ext, offset, stored, plain });
   }
-  return { root, encrypted, entries };
+  return { root, entries };
+}
+
+function readIndexFromTail(tail, label) {
+  const at = tail.lastIndexOf(ZSTD_MAGIC);
+  if (at < 0) throw new Error("꼬리에서 인덱스를 못 찾았다(더 길게 읽어야 한다): " + (label || ""));
+  const { root, entries } = parseIndex(P.zstdDecompress(tail.slice(at)));
+  return { root, entries, dataStart: HEADER_SIZE };
 }
 
 const NAME_TAGS = new Set(["Pfna", "Psna", "Pcna", "Pfln"]);
@@ -556,7 +582,7 @@ function readExportedTeam(data, label) {
 module.exports = {
   configure, HEADER_SIZE, ZSTD_MAGIC,
   fourcc, decodeDate, walkRecords,
-  readArchive, parsePeople, readExportedTeam,
+  readArchive, readIndexFromTail, parsePeople, readExportedTeam,
 };
 
 });</script>
@@ -2138,6 +2164,642 @@ module.exports = { buildPayload, html };
 
 });</script>
 <script>
+(function (root) {
+  "use strict";
+
+  const FILES = new Map();
+  const norm = (p) => String(p).replace(/\\/g, "/").replace(/\/+/g, "/");
+
+  const pathMod = {
+    sep: "/",
+    join: function () { return norm([].slice.call(arguments).filter(Boolean).join("/")); },
+    resolve: function () { return norm([].slice.call(arguments).filter(Boolean).join("/")); },
+    basename: (p) => norm(p).split("/").pop(),
+    dirname: (p) => norm(p).split("/").slice(0, -1).join("/") || ".",
+    extname: (p) => { const b = norm(p).split("/").pop(); const i = b.lastIndexOf("."); return i > 0 ? b.slice(i) : ""; },
+  };
+
+  let Bytes = null;
+  function setBytes(B) { Bytes = B; }
+  const wrap = (u8) => (Bytes && !(u8 instanceof Bytes) ? new Bytes(u8.buffer, u8.byteOffset, u8.byteLength) : u8);
+  const BufferShim = {
+    from: function (v, enc) {
+      if (typeof v === "string") {
+        if (enc === "hex") { const o = new Uint8Array(v.length / 2); for (let i = 0; i < o.length; i++) o[i] = parseInt(v.substr(i * 2, 2), 16); return wrap(o); }
+        return wrap(new TextEncoder().encode(v));
+      }
+      return wrap(v instanceof Uint8Array ? v : new Uint8Array(v));
+    },
+    alloc: (n) => wrap(new Uint8Array(n)),
+    concat: function (list) { let n = 0; for (const b of list) n += b.length; const o = new Uint8Array(n); let p = 0; for (const b of list) { o.set(b, p); p += b.length; } return wrap(o); },
+    byteLength: (s) => (typeof s === "string" ? new TextEncoder().encode(s).length : s.length),
+    isBuffer: (b) => b instanceof Uint8Array,
+  };
+
+  const enoent = (p) => { const e = new Error("ENOENT: no such file or directory, open '" + p + "'"); e.code = "ENOENT"; throw e; };
+  const fsMod = {
+    existsSync: (p) => FILES.has(norm(p)),
+    readFileSync: function (p, enc) {
+      const v = FILES.get(norm(p));
+      if (v === undefined) enoent(p);
+      if (enc || (enc && enc.encoding)) return typeof v === "string" ? v : new TextDecoder().decode(v);
+      return typeof v === "string" ? BufferShim.from(v) : wrap(v);
+    },
+    writeFileSync: function (p, data) { FILES.set(norm(p), typeof data === "string" ? data : wrap(data)); },
+    readdirSync: function (p) {
+      const d = norm(p).replace(/\/$/, "") + "/";
+      const out = [];
+      for (const k of FILES.keys()) if (k.startsWith(d)) { const rest = k.slice(d.length); if (rest && rest.indexOf("/") < 0) out.push(rest); }
+      return out;
+    },
+    statSync: function (p) { const v = FILES.get(norm(p)); if (v === undefined) enoent(p); return { size: typeof v === "string" ? BufferShim.byteLength(v) : v.length, isDirectory: () => false, isFile: () => true }; },
+    mkdirSync: function () {},
+
+    openSync: (p) => { if (!FILES.has(norm(p))) enoent(p); return { path: norm(p) }; },
+    closeSync: function () {},
+    readSync: function (fd, buf, off, len, pos) {
+      const v = FILES.get(fd.path); if (v === undefined) return 0;
+      const src = typeof v === "string" ? BufferShim.from(v) : v;
+      const n = Math.min(len, Math.max(0, src.length - pos));
+      buf.set(src.subarray(pos, pos + n), off);
+      return n;
+    },
+  };
+
+  const MODS = {};
+  function define(name, fn) { MODS[name] = fn; }
+
+  function run(name, argv, opts) {
+    opts = opts || {};
+    const log = [];
+    const cache = {};
+    const fakeProcess = {
+      argv: ["node", name].concat(argv || []),
+      env: opts.env || {},
+      exitCode: 0,
+      exit: function (c) { const e = new Error("process.exit(" + (c || 0) + ")"); e.__exit = c || 0; throw e; },
+      memoryUsage: () => ({ rss: 0, heapUsed: 0 }),
+      stdout: { write: (s) => log.push(String(s).replace(/\n$/, "")) },
+      platform: "browser",
+      cwd: () => "/",
+    };
+    const fakeConsole = {
+      log: function () { log.push([].slice.call(arguments).join(" ")); },
+      error: function () { log.push([].slice.call(arguments).join(" ")); },
+      warn: function () { log.push([].slice.call(arguments).join(" ")); },
+    };
+    function req(p) {
+      const k = String(p).replace(/^\.\//, "").replace(/^.*\//, "");
+      if (k === "fs") return fsMod;
+      if (k === "path") return pathMod;
+      if (k === "zlib") throw new Error("브라우저에는 zlib 이 없다 — 구획은 미리 풀어서 얹는다");
+      if (cache[k]) return cache[k].exports;
+      const fn = MODS[k];
+      if (!fn) throw new Error("모듈을 못 찾음: " + p);
+      const m = { exports: {} };
+      cache[k] = m;
+
+      const r = mkRequire(m, false);
+      fn(m, m.exports, r, fakeProcess, fakeConsole, BufferShim);
+      return m.exports;
+    }
+    function mkRequire(selfModule, isMain) {
+      const f = function (p) { return req(p); };
+      f.main = isMain ? selfModule : { __notMain: true };
+      return f;
+    }
+    const fn = MODS[name];
+    if (!fn) throw new Error("모듈을 못 찾음: " + name);
+    const m = { exports: {} };
+    cache[name] = m;
+    const r = mkRequire(m, true);
+    let err = null;
+    try { fn(m, m.exports, r, fakeProcess, fakeConsole, BufferShim); }
+    catch (e) { if (e.__exit === undefined) err = e; else if (e.__exit !== 0) err = new Error(name + " 가 " + e.__exit + " 로 끝났다"); }
+    return { log: log, files: FILES, error: err, exports: m.exports };
+  }
+
+  root.NodeRun = { put: (p, b) => FILES.set(norm(p), b), get: (p) => FILES.get(norm(p)), drop: (p) => FILES.delete(norm(p)),
+    clear: () => FILES.clear(), list: () => [...FILES.keys()], define: define, run: run, setBytes: setBytes,
+    fs: fsMod, path: pathMod, Buffer: BufferShim };
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<script>NodeRun.define("standing.js", function (module, exports, require, process, console, Buffer) {
+
+const fs = require("fs"), path = require("path");
+
+const CLI = require.main === module;
+
+const DIR = CLI ? process.argv[2] : process.env.STANDING_DIR;
+const ME = CLI ? Number(process.argv[3]) : 0;
+if (CLI && !DIR || (CLI && !ME && process.argv[3] !== "--리그")) {
+  console.log("쓰기: node save/standing.js <덤프폴더> <구단번호> [진행중시즌시작해]");
+  console.log("      node save/standing.js <덤프폴더> --리그 <시즌시작해> <대회번호>   리그 한 시즌 통째로");
+  process.exit(1);
+}
+
+const PSF = path.join(DIR, "player_stats_hist_dt.cmt");
+const LHF = path.join(DIR, "tc_league_history_dt.cmt");
+for (const f of [PSF, LHF]) if (!fs.existsSync(f)) { console.log("없다: " + f); process.exit(1); }
+
+const PS = fs.readFileSync(PSF);
+const PSZ = 152, PHEAD = 8, PN = (PS.length - PHEAD) / PSZ;
+if (!Number.isInteger(PN)) { console.log("player_stats 크기가 152 로 안 떨어진다."); process.exit(1); }
+const divCnt = new Map(), goals = new Map(), apps = new Map(), conc = new Map(), gkap = new Map();
+for (let i = 0; i < PN; i++) {
+  const o = PHEAD + i * PSZ, y = PS.readUInt16LE(o + 11);
+  if (y < 1990 || y > 2200) continue;
+  const c = PS.readUInt32LE(o + 1), d = PS.readUInt16LE(o + 5);
+  if (!divCnt.has(y)) { divCnt.set(y, new Map()); goals.set(y, new Map()); apps.set(y, new Map()); conc.set(y, new Map()); gkap.set(y, new Map()); }
+  const m = divCnt.get(y);
+  if (!m.has(c)) m.set(c, new Map());
+  m.get(c).set(d, (m.get(c).get(d) || 0) + 1);
+  if (PS[o + 31] === 1) { goals.get(y).set(c, (goals.get(y).get(c) || 0) + PS[o + 27]);
+    apps.get(y).set(c, (apps.get(y).get(c) || 0) + PS[o + 24]);
+
+    conc.get(y).set(c, (conc.get(y).get(c) || 0) + PS[o + 17]);
+
+    if ((PS[o + 17] > 0 || PS[o + 22] > 0) && PS[o + 17] + PS[o + 22] >= PS[o + 24])
+      gkap.get(y).set(c, (gkap.get(y).get(c) || 0) + PS[o + 24] + PS[o + 25]); }
+}
+const divOf = (y, c) => {
+  const m = divCnt.get(y);
+  if (!m || !m.has(c)) return null;
+  return [...m.get(c).entries()].sort((a, z) => z[1] - a[1])[0][0];
+};
+
+const LH = fs.readFileSync(LHF);
+const R = 24;
+const rd = (p) => ({ year: LH.readUInt16LE(p), comp: LH.readUInt16LE(p + 2), pos: LH[p + 4],
+  teams: LH.readUInt16LE(p + 5), pl: LH[p + 12], dup: LH[p + 13], w: LH[p + 14], d: LH[p + 15],
+  l: LH.readUInt16LE(p + 16), gf: LH.readUInt16LE(p + 18), ga: LH.readUInt16LE(p + 20),
+  pts: LH.readUInt16LE(p + 22) });
+const ok = (r) => r.year >= 1880 && r.year <= 2100 && r.pl >= 1 && r.pl <= 70 &&
+  (r.dup === 0 || r.dup === r.pl) && r.w + r.d + r.l === r.pl && r.teams >= 2 && r.teams <= 40 &&
+  r.pos < r.teams && r.gf <= 300 && r.ga <= 300 && r.pts <= 3 * r.pl;
+const rows = []; { let p = 8; while (p + R <= LH.length) { const r = rd(p); if (ok(r)) { r.at = p; rows.push(r); p += R; } else p++; } }
+const at = new Map(rows.map((r) => [r.at, r]));
+
+function group(endYear, comp) {
+  const heads = rows.filter((r) => r.year === endYear && r.comp === comp && r.pos === 0);
+  for (const h of heads) {
+    const g = [];
+    for (let i = 0; i < h.teams; i++) {
+      const q = at.get(h.at + i * R);
+      if (!q || q.year !== endYear || q.comp !== comp || q.pos !== i) { g.length = 0; break; }
+      g.push(q);
+    }
+    if (g.length === h.teams) return g;
+  }
+  return null;
+}
+
+const OG = 6;
+
+const GAT = 1;
+const FILL = 0.95;
+
+function solve(y, comp, lo, wide, ty) {
+
+  const g = group(ty || (y + 1), comp);
+  if (!g) return { err: "무리를 못 찾았다(진행 중이거나 기록 전)" };
+  const clubs = [...divCnt.get(y).keys()].filter((c) => divOf(y, c) === comp).sort((a, z) => a - z);
+
+  if (clubs.length > g.length) return { err: "구단 " + clubs.length + " > 줄 " + g.length + " — 디비전 판정이 이상하다" };
+  const need = 11 * g[0].pl;
+  const fullOf = (c) => ((apps.get(y).get(c) || 0) / need) >= FILL;
+  const full = clubs.map(fullOf);
+
+  const can = clubs.map((c) => g.map((r) => {
+    const d = r.gf - (goals.get(y).get(c) || 0);
+
+    const og = wide ? Math.ceil(OG * r.pl / 38) : OG;
+    if (fullOf(c)) { if (!(d >= lo && d <= og)) return false; }
+
+    else if (d < lo) return false;
+    if ((gkap.get(y).get(c) || 0) < r.pl) return true;
+    const e = r.ga - (conc.get(y).get(c) || 0);
+    return e <= GAT && e >= (lo < 0 ? lo : -GAT);
+  }));
+
+  for (let it = 0; it < 80; it++) {
+    let ch = false;
+    for (let i = 0; i < clubs.length; i++) {
+      if (!full[i]) continue;
+      const js = can[i].map((b2, j) => (b2 ? j : -1)).filter((j) => j >= 0);
+      if (js.length === 1) for (let k = 0; k < clubs.length; k++) if (k !== i && can[k][js[0]]) { can[k][js[0]] = false; ch = true; }
+    }
+    if (!ch) break;
+  }
+  const gkOK = (c) => (gkap.get(y).get(c) || 0) >= g[0].pl;
+  return { g: g, clubs: clubs, can: can, full: full, need: need, gkOK: gkOK, fullOf: fullOf };
+}
+
+function pickTableYear(y, comp, me) {
+
+  const cand = (ty) => { const s = solve(y, comp, 0, 0, ty); if (s.err) return -1; const i = s.clubs.indexOf(me); if (i < 0) return -1; return s.can[i].filter(Boolean).length; };
+  if (me == null) return y + 1;
+  const a = cand(y + 1); if (a === 1) return y + 1;
+  const b = cand(y); if (b === 1) return y;
+  return y + 1;
+}
+
+function tableYears(years, me) {
+  const out = new Map(), vote = new Map();
+  const cand = (y, comp, ty) => { const s = solve(y, comp, 0, 0, ty); if (s.err) return -1; const i = s.clubs.indexOf(me); if (i < 0) return -1; return s.can[i].filter(Boolean).length; };
+  for (const y of years) { const comp = divOf(y, me); if (!vote.has(comp)) vote.set(comp, { y: 0, y1: 0 });
+    const a = cand(y, comp, y + 1), b = cand(y, comp, y);
+
+    const full = (ty) => { const s = solve(y, comp, 0, 0, ty); return !s.err && s.fullOf(me); };
+    if (a === 1 && b !== 1) { if (full(y + 1)) vote.get(comp).y1++; }
+    else if (b === 1 && a !== 1) { if (full(y)) vote.get(comp).y++; } }
+  for (const y of years) { const v = vote.get(divOf(y, me)); out.set(y, v && v.y > v.y1 ? y : y + 1); }
+  tableYears.votes = vote;
+  return out;
+}
+const line = (r) => String(r.pos + 1).padStart(6) + String(r.pl).padStart(6) + String(r.w).padStart(4) +
+  String(r.d).padStart(4) + String(r.l).padStart(4) + String(r.gf).padStart(6) +
+  String(r.ga).padStart(5) + String(r.pts).padStart(6);
+
+if (CLI && process.argv[3] === "--리그") {
+  const y = Number(process.argv[4]), comp = Number(process.argv[5]);
+  if (!y || !comp) { console.log("쓰기: node save/standing.js <덤프폴더> --리그 <시즌시작해> <대회번호>"); process.exit(1); }
+  const s = solve(y, comp, 0, 0, y + 1);
+  if (s.err) { console.log(s.err); process.exit(1); }
+  console.log("대회 " + comp + " · " + y + "/" + String((y + 1) % 100).padStart(2, "0") + " — 구단 " + s.clubs.length + "개\n");
+  console.log("구단번호  자료   후보   순위  경기  승  무  패    득   실  승점");
+  let done = 0;
+  const used = new Map();
+  for (let i = 0; i < s.clubs.length; i++) {
+    const js = s.can[i].map((b2, j) => (b2 ? j : -1)).filter((j) => j >= 0);
+    const tag = s.full[i] ? "완전" : " 깎임";
+    if (js.length === 1 && s.full[i]) {
+      done++; used.set(js[0], (used.get(js[0]) || 0) + 1);
+      console.log(String(s.clubs[i]).padStart(8) + "  " + tag + "      1" + line(s.g[js[0]]));
+    } else {
+      console.log(String(s.clubs[i]).padStart(8) + "  " + tag + String(js.length).padStart(7) + "   못 정함");
+    }
+  }
+  const dup = [...used.values()].filter((v) => v > 1).length;
+  console.log("\n확정 " + done + "/" + s.clubs.length + " · 같은 줄을 두 구단이 차지한 경우 " + dup + "  (0 이어야 한다)");
+  process.exit(0);
+}
+
+if (!CLI) { module.exports = { solve: solve, pickTableYear: pickTableYear, tableYears: tableYears, divOf: divOf, group: group,
+  goals: goals, apps: apps, conc: conc, gkap: gkap, divCnt: divCnt, FILL: FILL, OG: OG, GAT: GAT }; return; }
+
+const years = [...goals.keys()].filter((y) => goals.get(y).has(ME)).sort((a, z) => a - z);
+console.log("구단 " + ME + " · 리그 기록이 있는 시즌 " + years.length + "개\n");
+console.log("시즌      리그  후보  순위  경기  승  무  패    득   실  승점");
+const TY = tableYears(years, ME);
+let done = 0;
+for (const y of years) {
+  const comp = divOf(y, ME);
+  const ty = TY.get(y);
+  const label = (ty === y ? (y + " 한해 ") : (y + "/" + String((y + 1) % 100).padStart(2, "0"))).padStart(7) + "  대회" + String(comp).padStart(4);
+  let s = solve(y, comp, 0, 0, ty);
+  if (s.err) { console.log(label + "   " + s.err); continue; }
+  const idx = s.clubs.indexOf(ME);
+  if (idx < 0) { console.log(label + "   이 리그에 우리 구단이 없다"); continue; }
+
+  const fill = (apps.get(y).get(ME) || 0) / s.need;
+  if (fill < FILL && !s.gkOK(ME)) {
+    console.log(label + "   자료 부족 — 채움률 " + (100 * fill).toFixed(0) + "% (" + (apps.get(y).get(ME) || 0) + "/" + s.need + ") · 골문도 덜 찼다");
+    continue;
+  }
+
+  let lo = 0, wide = 0;
+  while (!s.can[idx].some(Boolean)) {
+    if (!wide) { wide = 1; s = solve(y, comp, lo, wide, ty); continue; }
+    if (lo > -16) { lo -= 4; s = solve(y, comp, lo, wide, ty); continue; }
+    break;
+  }
+  const js = s.can[idx].map((b2, j) => (b2 ? j : -1)).filter((j) => j >= 0);
+  if (js.length !== 1) { console.log(label + String(js.length).padStart(6) + "   못 정함"); continue; }
+  done++;
+
+  const by = fill >= FILL ? " " : " ·실점만";
+  console.log(label + "     1" + line(s.g[js[0]]) + " " + by + (lo < 0 ? " 창" + lo : ""));
+}
+console.log("\n확정한 시즌 " + done + "/" + years.length);
+console.log("⚠ 득점은 자책골로 0~6 이 뜬다. 실점은 정확해서 ±1 로 건다 (머리말 검산 ①·①-2).");
+
+});</script>
+<script>NodeRun.define("season.js", function (module, exports, require, process, console, Buffer) {
+
+const fs = require("fs");
+const path = require("path");
+
+const DIR = process.argv[2], ME = Number(process.argv[3]);
+const PUB = process.argv[4] === "--내보내기" ? process.argv[5] : null;
+const OUT = PUB ? null : process.argv[4];
+if (!DIR || !ME || (process.argv[4] === "--내보내기" && !PUB)) {
+  console.log("쓰기: node save/season.js <덤프폴더> <구단번호> [출력.json]");
+  console.log("      node save/season.js <덤프폴더> <구단번호> --내보내기 \"<아카이브 구단 이름>\"");
+  process.exit(1);
+}
+
+process.env.STANDING_DIR = DIR;
+const S = require("./standing.js");
+
+const DETAIL = new Set([7, 8, 9, 10, 150, 195, 196]);
+const AT = { passTry: 40, passOk: 42, tackTry: 44, tackOk: 46, shot: 58, ontgt: 60 };
+const PS = fs.readFileSync(path.join(DIR, "player_stats_hist_dt.cmt"));
+const SZ = 152, HEAD = 8, PN = (PS.length - HEAD) / SZ;
+
+const agg = new Map();
+for (let i = 0; i < PN; i++) {
+  const o = HEAD + i * SZ;
+  if (PS.readUInt32LE(o + 1) !== ME || PS[o + 31] !== 1) continue;
+  if (PS[o + 24] + PS[o + 25] < 1) continue;
+  const y = PS.readUInt16LE(o + 11);
+  if (!agg.has(y)) agg.set(y, { n: 0, ap: 0, sub: 0, cs: 0, gkap: 0, sh: 0, ot: 0, pa: 0, po: 0, tk: 0, to: 0, rt: 0, rn: 0, xg: 0, xgn: 0, xgp: 0 });
+  const e = agg.get(y);
+  e.n++; e.ap += PS[o + 24]; e.sub += PS[o + 25];
+
+  e.rt += PS.readUInt16LE(o + 13); e.rn += PS[o + 26];
+
+  const isGK = (PS[o + 17] > 0 || PS[o + 22] > 0) && PS[o + 17] + PS[o + 22] >= PS[o + 24];
+  if (isGK) { e.cs += PS[o + 22]; e.gkap += PS[o + 24] + PS[o + 25]; }
+  e.sh += PS.readUInt16LE(o + AT.shot); e.ot += PS.readUInt16LE(o + AT.ontgt);
+
+  e.xg += PS.readUInt16LE(o + 104); e.xgn += PS.readUInt16LE(o + 140);
+
+  if (isGK) { const v = PS.readUInt16LE(o + 126); e.xgp += (v > 32767 ? v - 65536 : v); }
+  e.pa += PS.readUInt16LE(o + AT.passTry); e.po += PS.readUInt16LE(o + AT.passOk);
+  e.tk += PS.readUInt16LE(o + AT.tackTry); e.to += PS.readUInt16LE(o + AT.tackOk);
+}
+
+const cups = new Map();
+{
+  const CP = path.join(DIR, "tc_cup_history_dt.cmt");
+  if (fs.existsSync(CP)) {
+    const b = fs.readFileSync(CP), CSZ = 18, CH = 8, CN = (b.length - CH) / CSZ;
+    if (Number.isInteger(CN)) {
+      const rounds = new Map();
+      for (let i = 0; i < CN; i++) {
+        const o = CH + i * CSZ;
+        if (b[o + 8] === 0) continue;
+        const k = b.readUInt16LE(o + 4) + "|" + b.readUInt32LE(o);
+        let e = rounds.get(k);
+        if (!e) { e = { id: b.readUInt32LE(o), y: b.readUInt16LE(o + 4), teams: [], flag: new Map() }; rounds.set(k, e); }
+        const t = b.readUInt32LE(o + 14);
+        e.teams.push(t); e.flag.set(t, b[o + 8]);
+      }
+
+      const grp = new Map(); const keep = [];
+      for (const e of rounds.values()) {
+        if (!e.flag.has(ME)) continue;
+        const dec = e.teams.length === 2 && [...e.flag.values()].filter((x) => x === 3).length === 1;
+        if (dec) { keep.push(e); continue; }
+        const key = e.y + "|" + e.teams.slice().sort((x, z) => x - z).join(",");
+        if (!grp.has(key)) grp.set(key, e);
+      }
+      for (const [key, e] of grp) { const dup = keep.some((d) => d.y === e.y && d.teams.length === 2 && e.teams.length === 2 && d.teams.slice().sort((x, z) => x - z).join(",") === e.teams.slice().sort((x, z) => x - z).join(",")); if (!dup) keep.push(e); }
+      for (const e of keep) {
+        const three = [...e.flag.values()].filter((x) => x === 3).length;
+        let result;
+        if (e.teams.length === 2 && three === 1) result = e.flag.get(ME) === 3 ? "준우승" : "우승";
+        else if (e.teams.length === 2) result = "결승";
+        else result = e.teams.length + "강";
+
+        const y = e.y;
+        if (!cups.has(y)) cups.set(y, []);
+        cups.get(y).push({ teams: e.teams.length, result: result, round: e.id });
+      }
+    }
+  }
+}
+
+const years = [...S.goals.keys()].filter((y) => S.goals.get(y).has(ME)).sort((a, z) => a - z);
+
+let savedAt = null;
+try {
+  const gp = path.join(DIR, "game_db.dat");
+  if (fs.existsSync(gp)) {
+    const fd = fs.openSync(gp, "r"), hb = Buffer.alloc(40);
+    fs.readSync(fd, hb, 0, 40, 0); fs.closeSync(fd);
+    const yy = hb.readUInt16LE(38), dd = hb.readUInt16LE(36) & 511;
+    if (yy >= 1990 && yy <= 2200 && dd >= 1 && dd <= 366) {
+      const dt = new Date(Date.UTC(yy, 0, 1)); dt.setUTCDate(dd);
+      savedAt = dt.toISOString().slice(0, 10);
+    }
+  }
+} catch (e) { savedAt = null; }
+
+const out = { club: ME, dump: DIR, savedAt: savedAt, seasons: [] };
+let TY = null;
+for (const y of years) {
+  const comp = S.divOf(y, ME);
+  const rec = { season: y + "-" + String((y + 1) % 100).padStart(2, "0"), division: comp,
+    standing: null, why: null, stats: null, squadSize: (agg.get(y) || { n: 0 }).n,
+    cups: (cups.get(y) || []).sort((a, z) => a.teams - z.teams) };
+
+  const ty = (TY || (TY = S.tableYears(years, ME))).get(y); if (ty === y) rec.season = y + " 한해";
+  let s = S.solve(y, comp, 0, 0, ty);
+  let fill = null;
+  if (s.err) rec.why = s.err;
+  else {
+    const idx = s.clubs.indexOf(ME);
+    if (idx < 0) rec.why = "이 리그에 우리 구단이 없다";
+    else {
+      const need = s.need;
+      fill = (S.apps.get(y).get(ME) || 0) / need;
+      if (fill < S.FILL && !s.gkOK(ME)) rec.why = "자료 부족 — 채움률 " + (100 * fill).toFixed(0) + "% · 골문도 덜 찼다";
+      else {
+
+        let lo = 0, wide = 0;
+        while (!s.can[idx].some(Boolean)) {
+          if (!wide) { wide = 1; s = S.solve(y, comp, lo, wide, ty); continue; }
+          if (lo > -16) { lo -= 4; s = S.solve(y, comp, lo, wide, ty); continue; }
+          break;
+        }
+        const js = s.can[idx].map((v, j) => (v ? j : -1)).filter((j) => j >= 0);
+        if (js.length !== 1) rec.why = "못 정함 — 후보 " + js.length + "개";
+        else {
+          const r = s.g[js[0]];
+          rec.standing = { pos: r.pos + 1, teams: s.g.length, played: r.pl, w: r.w, d: r.d, l: r.l,
+            gf: r.gf, ga: r.ga, pts: r.pts,
+
+            by: fill >= S.FILL ? "채움" : "실점" };
+          if (lo < 0) rec.why = "승강 PO 로 창을 " + lo + " 까지 넓혔다";
+        }
+      }
+    }
+  }
+
+  const e = agg.get(y);
+  if (e && DETAIL.has(comp) && e.ap >= 11 && fill !== null && fill >= S.FILL) {
+    const g = e.ap / 11;
+
+    rec.stats = { games: +g.toFixed(1), fillPct: +(fill * 100).toFixed(1),
+      subsPerGame: +(e.sub / g).toFixed(2),
+      shots: +(e.sh / g).toFixed(1), onTarget: +(e.ot / g).toFixed(1),
+      onTargetPct: +(e.ot / e.sh * 100).toFixed(1),
+      passes: Math.round(e.pa / g), passPct: +(e.po / e.pa * 100).toFixed(1),
+
+      cleanSheets: e.gkap >= Math.round(g) ? e.cs : null,
+      tackles: +(e.tk / g).toFixed(1), tacklePct: +(e.to / e.tk * 100).toFixed(1),
+
+      avgRating: e.rn ? +(e.rt / 10 / e.rn).toFixed(2) : null,
+
+      xG: +(e.xg / 100 / g).toFixed(2), xGNoPen: +(e.xgn / 100 / g).toFixed(2),
+
+      xGPrevented: e.gkap >= Math.round(g) ? +(e.xgp / 100).toFixed(1) : null };
+  }
+  out.seasons.push(rec);
+}
+const done = out.seasons.filter((s) => s.standing).length;
+console.log("구단 " + ME + " · 시즌 " + out.seasons.length + "개 · 순위 확정 " + done +
+  " · 상세 스탯 " + out.seasons.filter((s) => s.stats).length +
+  " · 컵 " + out.seasons.filter((s) => s.cups.length).length +
+  " (우승 " + out.seasons.reduce((n, s) => n + s.cups.filter((c) => c.result === "우승").length, 0) + ")");
+if (PUB) {
+
+  out.archiveClub = PUB;
+  const last = out.seasons.length ? out.seasons[out.seasons.length - 1].season : "unknown";
+  const dir = path.join(__dirname, "..", "save-history");
+  fs.mkdirSync(dir, { recursive: true });
+  const name = (PUB + "_" + last).replace(/[^0-9A-Za-z가-힣_-]/g, "") + ".json";
+  fs.writeFileSync(path.join(dir, name), JSON.stringify(out, null, 1));
+  console.log("save-history/" + name + " 에 썼다  (아카이브 구단: " + PUB + ")");
+} else if (OUT) { fs.writeFileSync(OUT, JSON.stringify(out, null, 1)); console.log("썼다: " + OUT); }
+else console.log(JSON.stringify(out.seasons.slice(-3), null, 1));
+
+});</script>
+<script>NodeRun.define("manager.js", function (module, exports, require, process, console, Buffer) {
+
+const fs = require("fs");
+
+const F = process.argv[2];
+if (!F) { console.log("쓰기: node save/manager.js <person_record_manager.dat>"); process.exit(1); }
+const b = fs.readFileSync(F);
+const SIG = Buffer.from("15ffffffffffff", "hex");
+const dayStr = (d, y) => (y < 2000 || y > 2060 || d < 1 || d > 366) ? null :
+  (() => { const t = new Date(Date.UTC(y, 0, 1)); t.setUTCDate(d); return t.toISOString().slice(0, 10); })();
+
+const rows = [];
+{ let a = -1;
+  while ((a = b.indexOf(SIG, a + 1)) >= 0) {
+    const id = b.readUInt32LE(a + 7);
+    if (id < 1 || id > 400000) continue;
+    const team = b.readUInt32LE(a + 12);
+    const date = dayStr(b.readUInt16LE(a + 16) & 0x1ff, b.readUInt16LE(a + 18));
+    if (!date) continue;
+    rows.push({ at: a, id, team, date });
+  } }
+if (!rows.length) { console.log("레코드를 못 찾았다 — 이 파일은 감독 기록이 아니다"); process.exit(1); }
+rows.sort((x, y) => x.date < y.date ? -1 : 1);
+
+const ids = new Set(rows.map((r) => r.id));
+console.log("레코드 " + rows.length + "개 · 사람 " + ids.size + "명 " + [...ids].join(",") +
+  " · " + rows[0].date + " ~ " + rows[rows.length - 1].date);
+
+console.log(ids.size === 1 ? "  검산: 사람이 하나다   ✓" : "  검산: 사람이 여럿이다 — 머리말과 다르다   ✗");
+
+const byYear = new Map();
+for (const r of rows) { const y = r.date.slice(0, 4);
+  if (!byYear.has(y)) byYear.set(y, new Map());
+  const m = byYear.get(y); m.set(r.team, (m.get(r.team) || 0) + 1); }
+console.log("\n연도별 주 팀 (괄호는 그해 레코드 수, | 뒤는 그해 섞인 다른 번호)");
+let prev = null;
+
+var DIVOF = null;
+if (process.argv[3]) {
+  var sb = fs.readFileSync(process.argv[3]), REC = 152;
+  DIVOF = new Map();
+  for (var p = 8; p + REC <= sb.length; p += REC) {
+    var cl = sb.readUInt32LE(p + 1), yy = sb.readUInt16LE(p + 11);
+    if (yy < 2000 || yy > 2060) continue;
+    var k = cl + "|" + yy;
+    if (!DIVOF.has(k)) DIVOF.set(k, new Map());
+    var dm = DIVOF.get(k), dv = sb.readUInt16LE(p + 5); dm.set(dv, (dm.get(dv) || 0) + 1);
+  }
+  console.log("  시즌 기록표도 읽었다 — 디비전을 같이 낸다");
+}
+var divOf = function (team, y) {
+  if (!DIVOF) return "";
+  var dm = DIVOF.get(team + "|" + y);
+  if (!dm) return "   ·";
+  var best = null, n = -1;
+  dm.forEach(function (c, d) { if (c > n) { n = c; best = d; } });
+  return String(best).padStart(4);
+};
+for (const y of [...byYear.keys()].sort()) {
+  const m = byYear.get(y);
+  const top = [...m].sort((a, c) => c[1] - a[1]);
+  const other = top.slice(1).map((x) => x[0] + "×" + x[1]).join(" ");
+  console.log("  " + y + "   팀 " + String(top[0][0]).padStart(6) + " (" + top[0][1] + ")" +
+    (DIVOF ? "   디비전 " + divOf(top[0][0], +y) : "") +
+    (top[0][0] !== prev ? "   <- 바뀜" : "") + (other ? "   | " + other : ""));
+  prev = top[0][0];
+}
+
+const cnt = new Map();
+for (const r of rows) cnt.set(r.team, (cnt.get(r.team) || 0) + 1);
+console.log("\n팀별 레코드 수: " + [...cnt].sort((a, c) => c[1] - a[1]).map((x) => x[0] + "×" + x[1]).join(" "));
+console.log("★ 여기 나온 번호가 `player_stats_hist_dt` 의 `+1` 구단 칸이 쓰는 번호다 (4-26 ⑫).");
+
+module.exports = {
+  rows: rows,
+  person: [...ids][0],
+  teams: [...cnt].sort((a, c) => c[1] - a[1]).map(([team, n]) => ({ team: team, n: n })),
+  byYear: [...byYear].map(([y, m]) => ({ year: Number(y), main: [...m].sort((a, c) => c[1] - a[1])[0][0] })),
+};
+
+});</script>
+<script>NodeRun.define("cupid.js", function (module, exports, require, process, console, Buffer) {
+
+"use strict";
+const fs = require("fs"), path = require("path");
+const D = process.argv[2]; const NAMES = process.argv[3] ? JSON.parse(fs.readFileSync(process.argv[3], "utf8")) : {};
+if (!D) { console.log("쓰기: node save/cupid.js <덤프폴더> [이름표.json]"); process.exit(1); }
+const b = fs.readFileSync(path.join(D, "tc_cup_history_dt.cmt")); const SZ = 18, H = 8, N = (b.length - H) / SZ;
+const rounds = new Map();
+for (let i = 0; i < N; i++) { const o = H + i * SZ; if (b[o + 8] === 0) continue; const id = b.readUInt32LE(o), y = b.readUInt16LE(o + 4), t = b.readUInt32LE(o + 14);
+  const k = y + "|" + id; let e = rounds.get(k); if (!e) { e = { id, y, teams: [], flag: new Map() }; rounds.set(k, e); } e.teams.push(t); e.flag.set(t, b[o + 8]); }
+const winner = (y, id) => { const e = rounds.get(y + "|" + id); if (!e || e.teams.length !== 2) return null; const l = e.teams.filter((t) => e.flag.get(t) === 3); return l.length === 1 ? e.teams.find((t) => t !== l[0]) : null; };
+
+const F = new Map();
+for (const e of rounds.values()) { if (e.teams.length !== 2 || [...e.flag.values()].filter((x) => x === 3).length !== 1) continue; const f = F.get(e.id) || { years: new Set(), pool: new Set() }; f.years.add(e.y); e.teams.forEach((t) => f.pool.add(t)); F.set(e.id, f); }
+for (const [id, f] of F) if (f.years.size < 5) F.delete(id);
+const ids = [...F.keys()];
+
+const feed = new Map();
+for (const s of ids) { const ys = [...F.get(s).years]; const row = new Map();
+  for (const c of ids) { if (c === s) continue; let n = 0; for (const y of ys) { const w = winner(y - 1, c); if (w != null && rounds.get(y + "|" + s).teams.includes(w)) n++; } if (n / ys.length >= 0.5) row.set(c, n / ys.length); }
+  feed.set(s, row); }
+const label = new Map(), note = new Map();
+const top = (s, lo) => [...feed.get(s)].filter(([, r]) => r >= lo).sort((x, y) => y[1] - x[1]);
+
+const pairOf = new Map();
+for (const s of ids) { const two = top(s, 0.9).map(([c]) => c); if (two.length === 2) { label.set(s, "대륙 슈퍼컵"); note.set(s, "← " + two.join("·") + " 우승팀"); pairOf.set(s, two); two.forEach((c) => label.set(c, "대륙 결승")); } }
+
+const cnt = new Map(); for (const two of pairOf.values()) two.forEach((c) => cnt.set(c, (cnt.get(c) || 0) + 1));
+for (const [s, [x, y]] of pairOf) { const cx = cnt.get(x), cy = cnt.get(y);
+  if (cx === 2 && cy === 1) { label.set(x, "대륙 2부 결승"); label.set(y, "대륙 1부 결승"); }
+  else if (cx === 1 && cy === 2) { label.set(y, "대륙 2부 결승"); label.set(x, "대륙 1부 결승"); }
+  else if (cx === 2 && cy === 2) { label.set(s, "대륙간 한 판(2부 우승팀끼리)"); } }
+
+for (const s of ids) { if (label.has(s)) continue; const ys = [...F.get(s).years].sort(); const gaps = ys.slice(1).map((y, i) => y - ys[i]); if (ys.length >= 5 && gaps.filter((g) => g === 4).length >= gaps.length - 1) { label.set(s, "4년 주기 대회"); note.set(s, ys.join(",") + "  (클럽 월드컵·유로·아시안컵 등 — 클럽/대표 구분은 못 한다)"); } }
+
+for (const s of ids) { if (label.has(s)) continue; const one = top(s, 0.9); if (one.length === 1 && !label.has(one[0][0])) { label.set(s, "슈퍼컵"); note.set(s, "← " + one[0][0] + " 우승팀 " + (100 * one[0][1]).toFixed(0) + "%"); label.set(one[0][0], "국내컵(슈퍼컵 짝)"); } }
+
+for (const s of ids) { if (label.has(s)) continue; const one = top(s, 0.5).filter(([c]) => !/슈퍼컵/.test(label.get(c) || "")); if (one.length && !label.has(one[0][0])) { label.set(s, "슈퍼컵(4팀 추정)"); note.set(s, "← " + one[0][0] + " 우승팀 " + (100 * one[0][1]).toFixed(0) + "%"); label.set(one[0][0], "국내컵(슈퍼컵 짝)"); } }
+
+const ov = (s, c) => [...F.get(s).pool].filter((t) => F.get(c).pool.has(t)).length >= 2;
+const anchors = ids.filter((c) => /^(국내컵|슈퍼컵)/.test(label.get(c) || ""));
+for (const s of ids) { if (label.has(s)) continue; const hit = anchors.filter((c) => ov(s, c)).length; if (hit >= 4) { label.set(s, "대륙 대회"); note.set(s, "국내 닻 " + hit + "개와 겹침"); } }
+
+const rest = ids.filter((c) => !label.has(c));
+for (const s of rest) { const hit = [...anchors, ...rest.filter((c) => c !== s)].filter((c) => ov(s, c)).length; label.set(s, hit >= 1 ? "국내컵" : "?"); note.set(s, "겹침 " + hit); }
+
+console.log("결승 라운드 " + ids.length + "개 (2팀 결정 행 5해 이상) · " + D);
+for (const s of ids.sort((a, c) => (label.get(a) || "").localeCompare(label.get(c) || "") || a - c))
+  console.log("  " + String(s).padStart(5) + "  " + String(F.get(s).years.size).padStart(2) + "해  " + (label.get(s) || "?").padEnd(16) + (NAMES[s] ? NAMES[s].padEnd(22) : "".padEnd(22)) + (note.get(s) || ""));
+
+});</script>
+<script>
 "use strict";
 
 const REG = {};
@@ -2151,6 +2813,8 @@ async function loadModule(file) {
 }
 
 let core = null, platform = null, render = null;
+
+const SAVE_FILES = new Map();
 let DATA = null;
 
 async function boot() {
@@ -2257,6 +2921,7 @@ async function run(files, onProgress) {
       Object.assign(info, core.saveHeaderInfo(head, [...managers], platform));
     } catch (e) { info.error = e.message; }
     saves.push(info);
+    SAVE_FILES.set(info.file, f);
     done++;
   }
 
@@ -2332,6 +2997,7 @@ function show(data) {
 
   DATA = data;
   window.__data = data;
+  deepPanel();
 }
 
 function openArchive(id) {
@@ -2506,6 +3172,111 @@ window.addEventListener("DOMContentLoaded", async () => {
     });
   });
 });
+
+const DEEP_NEED = ["person_record_manager", "player_stats_hist_dt", "tc_league_history_dt", "tc_cup_history_dt"];
+
+async function deepRead(file, say) {
+  const parse = REG["parse.js"], Bytes = REG["platform-web.js"].Bytes;
+  if (!window.NodeRun) throw new Error("깊이 읽기 부분이 안 실려 있다 (한 장으로 묶은 판에서만 된다)");
+  NodeRun.clear();
+  NodeRun.setBytes(Bytes);
+
+  say("목록 읽는 중 — 파일 꼬리 4MB");
+  const TAIL = 4 * 1024 * 1024;
+  const tail = platform.from(new Uint8Array(await file.slice(Math.max(0, file.size - TAIL)).arrayBuffer()));
+  const idx = parse.readIndexFromTail(tail, file.name);
+
+  let got = 0, mb = 0;
+  for (const name of DEEP_NEED) {
+    const e = idx.entries.find((x) => x.name === name);
+    if (!e) continue;
+    say("읽는 중 " + name + " — " + (e.stored / 1048576).toFixed(0) + "MB");
+    const at = idx.dataStart + e.offset;
+    const raw = platform.from(new Uint8Array(await file.slice(at, at + e.stored).arrayBuffer()));
+    const out = platform.zstdDecompress(raw);
+    NodeRun.put("/save/" + name + "." + e.ext.replace(/^\./, ""), out);
+    got++; mb += out.length / 1048576;
+  }
+  if (got < DEEP_NEED.length) throw new Error("세이브에 필요한 구획이 없다 (" + got + "/" + DEEP_NEED.length + ")");
+
+  const gdb = idx.entries.find((x) => x.name === "game_db");
+  if (gdb) {
+    const at = idx.dataStart + gdb.offset;
+    const head = platform.from(new Uint8Array(await file.slice(at, at + Math.min(gdb.stored, 1 << 20)).arrayBuffer()));
+    try { NodeRun.put("/save/game_db.dat", platform.zstdDecompress(head).slice(0, 64)); } catch (e) {}
+  }
+
+  say("감독 기록 읽는 중");
+  const mgr = NodeRun.run("manager.js", ["/save/person_record_manager.dat"]);
+  if (mgr.error) throw mgr.error;
+  const teams = (mgr.exports && mgr.exports.teams) || [];
+  if (!teams.length) throw new Error("감독 기록에서 구단 번호를 못 찾았다");
+
+  const out = [];
+  for (const t of teams.slice(0, 5)) {
+    if (t.n < 3) continue;
+    say("시즌 짜는 중 — 구단 " + t.team);
+    const r = NodeRun.run("season.js", ["/save", String(t.team), "/out.json"]);
+    if (r.error) { out.push({ team: t.team, error: r.error.message }); continue; }
+    const v = r.files.get("/out.json");
+    out.push(Object.assign({ team: t.team, records: t.n },
+      JSON.parse(typeof v === "string" ? v : new TextDecoder().decode(v))));
+  }
+  NodeRun.clear();
+  return { teams: teams, clubs: out, mb: Math.round(mb), byYear: (mgr.exports && mgr.exports.byYear) || [] };
+}
+
+function deepRender(res) {
+  const DIV = { 7: "1부", 8: "2부", 9: "3부", 10: "4부", 150: "내셔널" };
+  const parts = res.clubs.map((c) => {
+    if (c.error) return '<p class="note">구단 ' + c.team + " — " + esc(c.error) + "</p>";
+    const rows = (c.seasons || []).slice().reverse().map((s) => {
+      const st = s.standing;
+      const cups = (s.cups || []).filter((x) => x.teams === 2 && x.result === "우승").length;
+      return "<tr><td>" + esc(s.season) + "</td><td>" + (DIV[s.division] || "디비전 " + s.division) + "</td>" +
+        (st ? "<td><b>" + st.pos + "위</b> / " + st.teams + "</td><td>" + st.w + "-" + st.d + "-" + st.l +
+              "</td><td>" + st.gf + ":" + st.ga + "</td><td>" + st.pts + "점</td>"
+            : '<td colspan="4" class="dim">' + esc(s.why || "순위 없음") + "</td>") +
+        "<td>" + (cups ? "🏆 " + cups : "") + "</td></tr>";
+    }).join("");
+    return "<h4>구단 번호 " + c.team + " <small>시즌 " + (c.seasons || []).length +
+      " · 세이브 시점 " + (c.savedAt || "모름") + "</small></h4>" +
+      '<div class="tblwrap"><table class="deept"><thead><tr><th>시즌</th><th>리그</th><th>순위</th><th>승-무-패</th><th>득:실</th><th>승점</th><th>컵</th></tr></thead><tbody>' +
+      rows + "</tbody></table></div>";
+  }).join("");
+  return '<div class="deepbox"><h3>세이브에서 읽은 것 <small>' + res.mb + "MB 만 떠왔습니다</small></h3>" +
+    parts + '<p class="note">구단 이름과 선수 이름은 아직 안 붙었습니다 — 그건 game_db(232MB) 가 필요합니다.</p></div>';
+}
+
+function deepPanel() {
+  const box = $("deep");
+  if (!box) return;
+  if (!SAVE_FILES.size || !window.NodeRun) { box.innerHTML = ""; return; }
+  box.innerHTML = '<div class="deepbox"><h3>세이브 깊이 읽기</h3>' +
+    '<p class="note">내보내기가 없어도 세이브만으로 시즌·순위·컵을 읽습니다. 필요한 부분만 떠오므로 파일 전체를 열지 않습니다.</p>' +
+    [...SAVE_FILES.keys()].map((n, i) =>
+      '<button type="button" class="deepbtn" data-i="' + i + '">' + esc(n) + " 읽기</button>").join(" ") +
+    '<div id="deeplog" class="note"></div><div id="deepout"></div></div>';
+  const names = [...SAVE_FILES.keys()];
+  box.querySelectorAll(".deepbtn").forEach(function (b) {
+    b.addEventListener("click", async function () {
+      const f = SAVE_FILES.get(names[Number(b.getAttribute("data-i"))]);
+      const log = $("deeplog"), outEl = $("deepout");
+      outEl.innerHTML = "";
+      box.querySelectorAll(".deepbtn").forEach((x) => { x.disabled = true; });
+      const t0 = Date.now();
+      try {
+        const res = await deepRead(f, (m) => { log.textContent = m; });
+        log.textContent = ((Date.now() - t0) / 1000).toFixed(1) + "초 걸렸습니다";
+        outEl.innerHTML = deepRender(res);
+      } catch (e) {
+        log.textContent = "읽지 못했습니다: " + e.message;
+        console.error(e);
+      }
+      box.querySelectorAll(".deepbtn").forEach((x) => { x.disabled = false; });
+    });
+  });
+}
 
 </script>
 
