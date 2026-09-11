@@ -5437,7 +5437,7 @@ const { scan } = require("./strings.js");
 function 서명맞나(b, a) {
   return a >= 32 &&
     b[a - 32] === 0xfe && b[a - 31] === 0xff && b[a - 30] === 0x02 &&
-    b[a - 28] === 0x00 && b[a - 27] === 0x02;
+    b[a - 27] === 0x02;
 }
 
 function readOne(file) {
@@ -6160,8 +6160,19 @@ function build(cfg, log) {
     const g = (D.gameDb || [])[0];
     if (!g) throw new Error("game_db 가 없다");
     COMP = require(path.join(AR, "save", "comps.js")).readComps(R(g));
+
+    const nd0 = (D.news || []).map((p) => R(p)).filter((p) => p && fs.existsSync(p));
+    let 더함 = 0;
+    if (nd0.length) {
+      try {
+        for (const [k, v] of require(path.join(AR, "save", "compnames.js")).readAll(nd0).map) {
+          if (!COMP.has(k) && v && v.name) { COMP.set(k, v.name); 더함++; }
+        }
+      } catch (e) { say("  뉴스 쪽 대회 이름 합치기 실패: " + e.message); }
+    }
     if (!COMP.size) { COMP = null; throw new Error("이름이 붙은 대회를 하나도 못 찾았다"); }
-    return COMP.size + "개 — " + [...COMP].slice(0, 3).map(([k, v]) => k + " " + v).join(" · ");
+    return COMP.size + "개 (game_db " + (COMP.size - 더함) + " + 뉴스 " + 더함 + ") — " +
+      [...COMP].slice(0, 3).map(([k, v]) => k + " " + v).join(" · ");
   }, note);
 
   let HIST = C ? C.history : null;
@@ -7237,7 +7248,7 @@ async function grabSections(file, say, journey) {
     if (e) total += e.stored;
   }
 
-  for (const e of idx.entries.filter((x) => /^d+_d+/.test(x.name)).slice(0, 120)) total += e.stored;
+  for (const e of idx.entries.filter((x) => /^\d+_\d+/.test(x.name)).slice(0, 120)) total += e.stored;
   if (say.bytes) say.bytes(done, total);
 
   const grab = async (name) => {
@@ -7273,7 +7284,7 @@ async function grabSections(file, say, journey) {
   for (const n of ["comp_history_dt", "news", "play_fixture_manager"]) { const v = await grab(n); if (v) at[n] = v; }
 
   at.matchFiles = [];
-  const matches = idx.entries.filter((e) => /^d+_d+/.test(e.name)).slice(0, 120);
+  const matches = idx.entries.filter((e) => /^\d+_\d+/.test(e.name)).slice(0, 120);
   if (matches.length) {
     say("대회 이름 모으는 중 — 경기 파일 " + matches.length + "개");
     for (const e of matches) { const v = await grab(e.name); if (v) at.matchFiles.push(v); }
@@ -7617,7 +7628,7 @@ async function spaBuild(file, wantNames, say) {
   }
   for (const name of SPA_WANT) { const g = await grab(name); if (g) { at[name] = g.path; mb += g.mb; } }
   at.matchFiles = [];
-  for (const e of idx.entries.filter((x) => /^d+_d+/.test(x.name)).slice(0, 120)) {
+  for (const e of idx.entries.filter((x) => /^\d+_\d+/.test(x.name)).slice(0, 120)) {
     const g = await grab(e.name); if (g) { at.matchFiles.push(g.path); mb += g.mb; }
   }
 
