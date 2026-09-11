@@ -1,12 +1,5 @@
-<!doctype html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>FM 커리어 아카이브</title>
-</head>
-<body>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ctext y=%2726%27 font-size=%2726%27%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
 <style>
 :root{
@@ -502,6 +495,8 @@ function parseIndex(index) {
 }
 
 function readIndexFromTail(tail, label) {
+
+  if (!P) throw new Error("parse.configure(platform) 를 먼저 호출해야 합니다");
   const at = tail.lastIndexOf(ZSTD_MAGIC);
   if (at < 0) throw new Error("꼬리에서 인덱스를 못 찾았다(더 길게 읽어야 한다): " + (label || ""));
   const { root, entries } = parseIndex(P.zstdDecompress(tail.slice(at)));
@@ -2163,6 +2158,1603 @@ if (require.main === module) {
 module.exports = { buildPayload, html };
 
 });</script>
+<script>window.__define("spa.js", function (module, exports, require) {
+"use strict";
+
+const HEAD = `<title>더 아이언 연대기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* ── 색 토큰: fm-archive/DESIGN.md 의 정본을 그대로 옮겼다.
+      세 갈래 테마(직접 밝게 / 직접 어둡게 / 아무것도 안 고름)를 다 덮는다. ───────── */
+:root{
+  color-scheme: light;
+  --ground:#f4f5f7; --surface:#fdfdfe; --surface-2:#eef0f4; --sunken:#e7eaef;
+  --ink:#0f1114; --ink-2:#454b55; --ink-3:#767d89;
+  --line:#dde1e8; --line-strong:#c3cad4;
+  --accent:#2a78d6; --accent-soft:#e3edfb;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --good:#0ca30c; --crit:#d03b3b;
+  --shadow:0 1px 2px rgba(15,17,20,.06), 0 8px 24px -16px rgba(15,17,20,.25);
+  --from-export:#7a5af0; --from-save:#0f9b8e;
+  /* 전시실 — 두 테마 모두 같은 값이다. 트로피는 어두운 데서 빛난다 */
+  --case:#14161b; --case-2:#1c1f26; --case-ink:#f2f0ea; --case-ink-2:#a5a396;
+  --case-line:#2b2f38; --gold:#e0a83c; --gold-soft:#3a2f16;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --ground:#0f1113; --surface:#191c1f; --surface-2:#22262a; --sunken:#141719;
+    --ink:#eef1f4; --ink-2:#b3bac4; --ink-3:#7c848f;
+    --line:#2b3035; --line-strong:#3b424a;
+    --accent:#3987e5; --accent-soft:#17263a;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --good:#2fbf2f; --crit:#e05a5a;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -16px rgba(0,0,0,.8);
+    --from-export:#a08cf5; --from-save:#3fc4b6;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --ground:#0f1113; --surface:#191c1f; --surface-2:#22262a; --sunken:#141719;
+  --ink:#eef1f4; --ink-2:#b3bac4; --ink-3:#7c848f;
+  --line:#2b3035; --line-strong:#3b424a;
+  --accent:#3987e5; --accent-soft:#17263a;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --good:#2fbf2f; --crit:#e05a5a;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -16px rgba(0,0,0,.8);
+  --from-export:#a08cf5; --from-save:#3fc4b6;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Archivo","Segoe UI",system-ui,-apple-system,sans-serif;
+  font-size:14px; line-height:1.55;
+}
+.num{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace; font-variant-numeric:tabular-nums}
+.wrap{max-width:1180px; margin:0 auto; padding:0 20px 72px}
+
+/* ── 전시실: 페이지 폭을 넘어 좌우로 꽉 차게 ── */
+.case{background:var(--case); color:var(--case-ink);
+  margin:0 calc(50% - 50vw) 40px; padding:34px calc(50vw - 50%) 30px;
+  border-bottom:1px solid var(--case-line)}
+.case a,.case b{color:inherit}
+.case .eyebrow{color:var(--gold)}
+.case h1{font-size:clamp(34px,6.4vw,58px); letter-spacing:-.035em; line-height:1.02}
+.case .sub{color:var(--case-ink-2)}
+.case .sub b{color:var(--case-ink)}
+.case .dim{color:#7d7c73}
+.case .themebtn{background:transparent; border-color:var(--case-line); color:var(--case-ink-2)}
+.case .themebtn:hover{border-color:var(--gold); color:var(--gold)}
+.case .top{border-bottom:1px solid var(--case-line)}
+.case .tiles{background:var(--case-line); border-color:var(--case-line)}
+.case .tile{background:var(--case)}
+.case .tile .k{color:var(--case-ink-2)}
+.case .tile .v{color:var(--case-ink)}
+.case .tile .v.word{color:var(--case-ink)}
+.case .tile .n{color:#7d7c73}
+
+/* 전시실 안 명예의전당 */
+.case .hof{background:transparent; margin-top:26px;
+  grid-template-columns:repeat(auto-fit,minmax(224px,1fr))}
+.case .hof > div{background:var(--case-2); border:1px solid var(--case-line); border-radius:11px;
+  margin:0 0 0 0}
+.case .hof{gap:11px}
+.case .hof .t{color:var(--case-ink)}
+.case .hof .cnt{color:var(--gold)}
+.case .hof .n{color:var(--case-ink-2)}
+.caseHead{display:flex; align-items:baseline; gap:12px; margin:30px 0 0}
+.caseHead h2{margin:0; font-size:15px; font-weight:600; letter-spacing:.02em; color:var(--case-ink)}
+.caseHead .snum{color:var(--gold); border-color:var(--gold-soft)}
+/* 국가대표 구획 */
+.wc{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:11px; margin-top:6px}
+.wc .yr{background:var(--case-2); border:1px solid var(--case-line); border-radius:11px;
+  padding:13px 15px}
+.wc .yr.mine{border-color:var(--gold)}
+.wc .y{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--case-ink-2);
+  letter-spacing:.08em}
+.wc .w{font-size:17px; font-weight:700; margin:3px 0 1px; color:var(--case-ink)}
+.wc .yr.mine .w{color:var(--gold)}
+.wc .l{font-size:11.5px; color:#7d7c73}
+.spells{display:flex; flex-wrap:wrap; gap:9px; margin-top:12px}
+.spell{border:1px solid var(--case-line); border-radius:20px; padding:4px 13px; font-size:12.5px;
+  color:var(--case-ink-2)}
+.spell b{color:var(--case-ink)}
+.spell.nat{border-color:var(--gold); color:var(--gold)}
+.spell.nat b{color:var(--gold)}
+/* 트로피 사진 */
+.cupimg{width:44px; height:56px; object-fit:contain; object-position:center bottom;
+  flex:0 0 44px; filter:drop-shadow(0 3px 7px rgba(0,0,0,.55))}
+.case .hof > div{align-items:center}
+.cuppic{display:block; margin:0 auto; object-fit:contain; object-position:center bottom}
+.cuppic.win{width:34px; height:42px}
+.cuppic.lose{width:34px; height:42px; filter:grayscale(1) brightness(1.15)}
+.cuppic.final{width:34px; height:42px; filter:grayscale(1) brightness(.75); opacity:.55}
+.pd-title{display:flex; align-items:center; gap:11px; margin-top:16px}
+.pd-title img{width:38px; height:46px; object-fit:contain; object-position:center bottom;
+  filter:drop-shadow(0 3px 7px rgba(0,0,0,.55))}
+.pd-title b{font-size:15px; color:var(--gold)}
+.pd-title span{font-size:12px; color:var(--case-ink-2)}
+/* 시즌 캐러셀 */
+.ss-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px}
+.ss-bar label{font-size:12px; color:var(--ink-3)}
+.ss-sel{font-family:inherit; font-size:13px; padding:6px 10px; border-radius:9px;
+  border:1px solid var(--line-strong); background:var(--surface); color:var(--ink)}
+.ss-sel:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.ss-nav{display:flex; gap:5px}
+.ss-nav button{appearance:none; width:30px; height:30px; border-radius:9px; cursor:pointer;
+  border:1px solid var(--line-strong); background:var(--surface); color:var(--ink-2);
+  font-size:14px; line-height:1; display:grid; place-items:center}
+.ss-nav button:hover{border-color:var(--accent); color:var(--accent)}
+.ss-rail{display:flex; gap:11px; overflow-x:auto; padding:4px 2px 12px;
+  scroll-snap-type:x proximity; scrollbar-width:thin}
+.ss-card{flex:0 0 158px; scroll-snap-align:center; cursor:pointer; text-align:left;
+  border:1px solid var(--line); border-radius:13px; background:var(--surface);
+  padding:12px 13px 13px; font-family:inherit; transition:border-color .12s, transform .12s}
+.ss-card:hover{border-color:var(--line-strong); transform:translateY(-2px)}
+.ss-card.on{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset}
+.ss-card:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.ss-y{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-2); letter-spacing:.04em}
+.ss-div{font-size:11px; color:var(--ink-3); margin-top:1px}
+.ss-pos{font-family:'IBM Plex Mono',monospace; font-size:20px; font-weight:600; margin-top:6px}
+.ss-pos.win{color:var(--s4)}
+.ss-cups{display:flex; flex-wrap:wrap; gap:3px; align-items:flex-end; min-height:40px; margin-top:8px}
+.ss-cups img{width:26px; height:34px; object-fit:contain; object-position:center bottom}
+.ss-cups img.lose{filter:grayscale(1) brightness(1.15)}
+.ss-cups img.final{filter:grayscale(1) brightness(.8); opacity:.55}
+.ss-cups .none{font-size:11px; color:var(--ink-3)}
+.ss-n{font-size:11px; color:var(--ink-3); margin-top:5px}
+/* 올해의 팀 */
+.xi-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:6px 0 12px}
+.xi-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:9px}
+.xi-card{border:1px solid var(--case-line); background:var(--case-2); border-radius:11px; padding:9px 11px;
+  display:grid; grid-template-columns:22px 1fr auto; gap:8px; align-items:center}
+.xi-card.mine{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold) inset}
+.xi-card.bench{opacity:.72}
+.xi-n{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--case-ink-2)}
+.xi-name{font-size:13px; font-weight:600; color:var(--case-ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.xi-name.unk{font-weight:400; color:var(--case-ink-2)}
+.xi-st{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--case-ink-2); text-align:right; line-height:1.35}
+.xi-st b{color:var(--case-ink); font-weight:600}
+.xi-sub{font-size:11px; color:var(--case-ink-2); margin:12px 0 6px; letter-spacing:.06em; text-transform:uppercase}
+.wc .y .ac{color:var(--gold)}
+/* SPA — 화면 셋 */
+.caseTop{margin-bottom:0; padding-bottom:0; border-bottom:0}
+.nav{display:flex; gap:2px; margin:22px 0 0; padding:0;
+  border-bottom:1px solid var(--case-line)}
+.navbtn{appearance:none; background:transparent; border:0; cursor:pointer;
+  font-family:inherit; font-size:14px; font-weight:600; letter-spacing:.01em;
+  color:var(--case-ink-2); padding:11px 18px 12px; border-bottom:2px solid transparent;
+  margin-bottom:-1px; white-space:nowrap; transition:color .12s, border-color .12s}
+.navbtn:hover{color:var(--case-ink)}
+.navbtn[aria-selected="true"]{color:var(--gold); border-bottom-color:var(--gold)}
+.navbtn:focus-visible{outline:2px solid var(--gold); outline-offset:-4px}
+.view > .case:first-child{margin-top:0}
+.view > section:first-child{margin-top:34px}
+@media (max-width:560px){ .nav{overflow-x:auto} .navbtn{padding:10px 13px; font-size:13px} }
+/* 개인 수상 · 커리어 진열대 — 이름 충돌을 피해 전부 aw- 접두어를 쓴다 */
+.aw-shelf{display:block; margin-top:20px; border:1px solid var(--case-line);
+  border-radius:13px; overflow:hidden}
+.aw-top{display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 18px;
+  padding:15px 18px; background:var(--case-2); border-bottom:1px solid var(--case-line)}
+.aw-top .aw-nm{font-size:19px; font-weight:700; color:var(--gold); line-height:1.2}
+.aw-top .aw-st{font-size:12px; color:var(--case-ink-2)}
+.aw-top .aw-st b{color:var(--case-ink); font-family:'IBM Plex Mono',monospace; font-weight:600}
+.aw-strip{display:flex; overflow-x:auto}
+.aw-col{flex:1 0 66px; border-right:1px solid var(--case-line); padding:11px 6px 12px;
+  display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:8px}
+.aw-col:last-child{border-right:0}
+.aw-y{font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--case-ink-2);
+  letter-spacing:.03em; white-space:nowrap}
+.aw-pips{display:flex; flex-wrap:wrap-reverse; gap:3px; justify-content:center;
+  width:53px; min-height:46px; align-items:flex-end}
+.aw-pip{width:7px; height:7px; border-radius:50%; background:#4a4636; flex:0 0 auto}
+.aw-pip.on{background:var(--gold); box-shadow:0 0 5px rgba(224,168,60,.55)}
+.aw-n{font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:600; color:var(--case-ink)}
+.aw-col.max .aw-n{color:var(--gold)}
+/* 수상자 명단 */
+.aw-list{display:grid; grid-template-columns:repeat(auto-fit,minmax(236px,1fr)); gap:10px; margin-top:18px}
+.aw-row{background:var(--case-2); border:1px solid var(--case-line); border-radius:11px; padding:12px 14px}
+.aw-row.mgr{border-color:var(--gold)}
+.aw-row .aw-r1{font-size:14px; font-weight:600; color:var(--case-ink); word-break:keep-all}
+.aw-row .aw-r2{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--case-ink-2); margin-top:2px}
+.aw-bar{height:4px; border-radius:3px; background:#33312a; margin:9px 0 8px; overflow:hidden}
+.aw-bar i{display:block; height:100%; background:var(--gold); border-radius:3px}
+.aw-chips{display:flex; flex-wrap:wrap; gap:5px}
+.aw-chip{font-size:10.5px; line-height:1.6; padding:1px 8px; border-radius:20px;
+  border:1px solid var(--gold-soft); color:var(--gold); word-break:keep-all}
+.aw-chip.q{border-color:var(--case-line); color:#7d7c73}
+/* 포디움 카드 */
+.pd-pick{display:flex; flex-wrap:wrap; gap:6px; margin-top:14px}
+.pd-tab{font-size:11.5px; line-height:1.7; padding:2px 11px; border-radius:20px; cursor:pointer;
+  border:1px solid var(--case-line); color:var(--case-ink-2); background:transparent;
+  font-family:inherit; word-break:keep-all; transition:border-color .12s, color .12s}
+.pd-tab:hover{border-color:var(--gold-soft); color:var(--case-ink)}
+.pd-tab[aria-selected="true"]{border-color:var(--gold); color:var(--gold); background:var(--gold-soft)}
+.pd-tab:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
+.pd-rail{display:flex; gap:11px; overflow-x:auto; padding:16px 2px 6px;
+  scroll-snap-type:x proximity; scrollbar-width:thin}
+.pd-card{flex:0 0 208px; scroll-snap-align:start; border:1px solid var(--case-line);
+  border-radius:13px; background:var(--case-2); padding:13px 14px 14px}
+.pd-card.mine{border-color:var(--gold)}
+.pd-yr{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--case-ink-2);
+  letter-spacing:.06em; margin-bottom:9px}
+.pd-row{display:flex; align-items:baseline; gap:8px; padding:5px 0;
+  border-top:1px solid rgba(255,255,255,.05)}
+.pd-row:first-of-type{border-top:0}
+.pd-rk{flex:0 0 17px; height:17px; border-radius:50%; display:inline-flex;
+  align-items:center; justify-content:center; font-size:9.5px; font-weight:700;
+  font-family:'IBM Plex Mono',monospace; color:#1a1710; align-self:center}
+.pd-rk.g1{background:linear-gradient(160deg,#f0c85f,#c8902a)}
+.pd-rk.g2{background:linear-gradient(160deg,#d8dade,#9aa0a8)}
+.pd-rk.g3{background:linear-gradient(160deg,#d4a074,#9a6437)}
+.pd-nm{flex:1; min-width:0; font-size:12.5px; color:var(--case-ink); overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap}
+.pd-row.top .pd-nm{font-weight:700; font-size:13.5px}
+.pd-row.mine .pd-nm{color:var(--gold)}
+.pd-nm.unk{color:#6f6e66; font-style:italic}
+.pd-ag{font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:#7d7c73}
+.pd-none{color:#6f6e66; font-size:12px; padding:4px 0}
+/* 세계 골든 볼 계보 */
+.aw-ballon{display:grid; grid-template-columns:repeat(auto-fit,minmax(196px,1fr)); gap:9px; margin-top:16px}
+.aw-bal{display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:10px;
+  border:1px solid var(--case-line); background:var(--case-2); min-width:0}
+.aw-bal.mine{border-color:var(--gold); background:linear-gradient(180deg,rgba(224,168,60,.10),transparent)}
+.aw-bal .aw-by{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--case-ink-2); white-space:nowrap}
+.aw-bal .aw-bw{font-size:12.5px; font-weight:600; color:var(--case-ink); min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.aw-bal.mine .aw-bw{color:var(--gold)}
+.caseNote{color:#7d7c73; font-size:12.5px; margin:6px 0 0; max-width:78ch}
+.caseNote b{color:var(--case-ink-2)}
+
+/* ── 머리 ─────────────────────────────────────────────── */
+.top{display:flex; flex-wrap:wrap; gap:20px; align-items:flex-end; justify-content:space-between;
+  padding-bottom:20px; border-bottom:2px solid var(--line-strong)}
+.eyebrow{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin:0 0 6px}
+h1{margin:0; font-size:34px; font-weight:700; letter-spacing:-.02em; text-wrap:balance; line-height:1.1}
+.sub{margin:8px 0 0; color:var(--ink-2); font-size:13.5px}
+.themebtn{background:var(--surface); border:1px solid var(--line-strong); color:var(--ink-2);
+  border-radius:7px; padding:6px 13px; font-size:12px; font-family:inherit; cursor:pointer}
+.themebtn:hover{border-color:var(--accent); color:var(--accent)}
+.themebtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+/* ── 요약 타일 ─────────────────────────────────────────── */
+.tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(158px,1fr)); gap:1px;
+  background:var(--line); border:1px solid var(--line); border-radius:10px; overflow:hidden; margin:22px 0 34px}
+.tile{background:var(--surface); padding:14px 16px}
+.tile .k{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:5px}
+.tile .v{font-family:"IBM Plex Mono",monospace; font-size:25px; font-weight:600;
+  font-variant-numeric:tabular-nums; line-height:1.15; letter-spacing:-.02em}
+.tile .n{font-size:11.5px; color:var(--ink-3); margin-top:2px}
+/* 글자 값(디비전 이름 등)은 숫자 글꼴·큰 크기로 두면 줄이 깨진다 */
+.tile .v.word{font-family:"Archivo",system-ui,sans-serif; font-size:18px; font-weight:600;
+  letter-spacing:-.01em; line-height:1.25; text-wrap:balance; padding-top:3px}
+
+/* ── 구획 ─────────────────────────────────────────────── */
+section{margin:0 0 42px}
+.shead{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin:0 0 4px}
+.shead h2{margin:0; font-size:19px; font-weight:600; letter-spacing:-.01em}
+.snum{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-3);
+  border:1px solid var(--line-strong); border-radius:4px; padding:1px 6px}
+.sdesc{margin:0 0 16px; color:var(--ink-2); font-size:13px; max-width:76ch}
+
+/* 출처 딱지 — 블록마다 "이게 어디서 왔는지"를 못 박는다 */
+.src{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em;
+  text-transform:uppercase; padding:2px 8px; border-radius:20px; border:1px solid currentColor;
+  white-space:nowrap}
+.src.ex{color:var(--from-export)} .src.sv{color:var(--from-save)}
+
+.card{background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  box-shadow:var(--shadow); overflow:hidden}
+.scroll{overflow-x:auto}
+
+/* ── 표 ───────────────────────────────────────────────── */
+table{border-collapse:collapse; width:100%; font-size:13px}
+th{background:var(--surface-2); text-align:right; font-weight:600; font-size:11px;
+  letter-spacing:.05em; text-transform:uppercase; color:var(--ink-2);
+  padding:9px 10px; white-space:nowrap; border-bottom:1px solid var(--line-strong);
+  position:sticky; top:0; z-index:2}
+th.l,td.l{text-align:left}
+td{padding:7px 10px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap}
+tbody tr:nth-child(even){background:color-mix(in srgb, var(--surface-2) 45%, transparent)}
+tbody tr:hover{background:var(--accent-soft)}
+tbody tr:last-child td{border-bottom:none}
+.dim{color:var(--ink-3)}
+.miss{color:var(--ink-3); font-style:italic}
+
+/* 순위 배지 */
+.pos{display:inline-block; min-width:26px; padding:1px 6px; border-radius:5px;
+  font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:600; text-align:center}
+.pos.gold{background:var(--accent); color:#fff}
+.pos.top{background:var(--accent-soft); color:var(--accent)}
+.pos.plain{background:var(--sunken); color:var(--ink-2)}
+
+/* 막대 하나 (표 안) */
+.bar{display:inline-flex; align-items:center; gap:7px; justify-content:flex-end}
+.bar i{display:block; height:7px; border-radius:0 3px 3px 0; background:var(--s1)}
+.bar.g i{background:var(--s3)} .bar.o i{background:var(--s2)} .bar.y i{background:var(--s4)}
+
+/* CA/PA 게이지 */
+.gauge{position:relative; width:96px; height:9px; background:var(--sunken); border-radius:4px; display:inline-block; vertical-align:middle}
+.gauge b{position:absolute; left:0; top:0; bottom:0; background:var(--s1); border-radius:4px 2px 2px 4px}
+.gauge u{position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--s2)}
+
+.legend{display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--ink-2); margin:12px 0 0}
+.legend span{display:inline-flex; align-items:center; gap:6px}
+.sw{width:11px; height:11px; border-radius:3px; display:inline-block}
+
+.note{font-size:12px; color:var(--ink-3); margin:11px 0 0; max-width:80ch}
+.note b{color:var(--ink-2); font-weight:600}
+.warn{border-left:3px solid var(--s4); padding:9px 0 9px 12px; background:var(--surface-2);
+  border-radius:0 7px 7px 0; margin:14px 0 0; font-size:12.5px; color:var(--ink-2)}
+
+/* 트로피 진열대 */
+.troph{display:grid; grid-template-columns:auto 1fr; gap:0}
+.troph .yr{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-2);
+  padding:9px 14px; border-bottom:1px solid var(--line); white-space:nowrap; background:var(--surface-2)}
+.troph .cs{padding:7px 14px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+.troph .yr:last-of-type,.troph .cs:last-of-type{border-bottom:none}
+.chip{font-size:12px; padding:2px 10px; border-radius:20px; border:1px solid var(--line-strong);
+  color:var(--ink-2); display:inline-flex; gap:6px; align-items:center; white-space:nowrap}
+.chip.win{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600}
+.chip.lose{border-color:var(--crit); color:var(--crit)}
+.chip .foe{opacity:.8; font-size:11px}
+.troph .none{color:var(--ink-3); font-size:12px; font-style:italic}
+/* 진열대 — 선반 */
+.shelf{display:grid; grid-template-columns:78px 1fr; align-items:stretch}
+.shelf > .yr{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-2);
+  padding:12px 0 12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center}
+.shelf > .goods{padding:8px 16px 10px; border-bottom:1px solid var(--line);
+  display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; min-height:56px;
+  background:linear-gradient(to bottom, transparent 0 calc(100% - 3px), var(--sunken) calc(100% - 3px))}
+.shelf > *:nth-last-child(-n+2){border-bottom:none}
+.shelf .season-row{cursor:pointer}
+.shelf .season-row:hover{background:var(--accent-soft)}
+.shelf .season-row.on{background:var(--accent-soft); box-shadow:inset 3px 0 0 var(--accent)}
+.good{display:flex; flex-direction:column; align-items:center; gap:2px; width:46px}
+.good .cap.nm{color:var(--ink-2); font-weight:600; font-size:9.5px}
+.hof{display:grid; grid-template-columns:repeat(auto-fit,minmax(232px,1fr)); gap:0; background:var(--surface)}
+.hof > div{background:var(--surface); padding:14px 16px; display:flex; gap:13px; align-items:flex-start;
+  border-right:1px solid var(--line); border-bottom:1px solid var(--line)}
+.hof .txt{min-width:0; flex:1}
+.hof .t{font-size:13px; font-weight:600; line-height:1.3; margin-bottom:3px; word-break:keep-all; text-wrap:balance}
+.hof .n{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3); line-height:1.5;
+  word-break:keep-all}
+.hof .cnt{font-family:"IBM Plex Mono",monospace; font-size:19px; font-weight:600; color:var(--s4)}
+.good .cap{font-size:9.5px; color:var(--ink-3); font-family:"IBM Plex Mono",monospace; line-height:1.2; text-align:center}
+.empty{color:var(--ink-3); font-size:12px; font-style:italic; align-self:center}
+
+/* 시즌 상세 패널 */
+.panel{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:1px; background:var(--line)}
+.panel > div{background:var(--surface); padding:16px 18px}
+.panel h3{margin:0 0 10px; font-size:12px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--ink-3); font-family:"IBM Plex Mono",monospace; font-weight:600}
+.kv{display:grid; grid-template-columns:auto 1fr; gap:4px 12px; font-size:13px}
+.kv dt{color:var(--ink-3)} .kv dd{margin:0; text-align:right; font-family:"IBM Plex Mono",monospace;
+  font-variant-numeric:tabular-nums}
+.panel .big{font-family:"IBM Plex Mono",monospace; font-size:30px; font-weight:600; line-height:1.1;
+  letter-spacing:-.02em}
+.panel .cabinet{display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; min-height:70px}
+.plist{list-style:none; margin:0; padding:0; font-size:13px}
+.plist li{display:flex; justify-content:space-between; gap:10px; padding:3px 0;
+  border-bottom:1px solid var(--line)}
+.plist li:last-child{border-bottom:none}
+/* 다섯 칸이 4열 격자에 들어가면 마지막 하나가 혼자 남아 빈 자리가 크게 생긴다 —
+   마지막 칸을 남은 열 전체로 펴고, 목록을 여러 단으로 흘린다 */
+.panel > div:nth-child(5){grid-column:1 / -1}
+.panel > div:nth-child(5) .plist{columns:2; column-gap:28px}
+@media (max-width:560px){ .panel > div:nth-child(5) .plist{columns:1} }
+/* 패널 안 트로피는 크게 — 여기가 진열대의 주인공이다 */
+.panel .cabinet svg{width:48px; height:59px}
+.panel .cabinet .good{width:62px}
+.plist .nm{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.plist .fl{color:var(--ink-3); font-size:11px}
+svg{display:block; max-width:100%}
+svg text{font-family:"IBM Plex Mono",monospace; fill:var(--ink-3)}
+.tip{position:fixed; pointer-events:none; z-index:50; background:var(--surface);
+  border:1px solid var(--line-strong); border-radius:8px; padding:8px 11px; font-size:12px;
+  box-shadow:var(--shadow); max-width:270px; opacity:0; transition:opacity .1s}
+.tip.on{opacity:1}
+.tip b{display:block; font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3);
+  letter-spacing:.06em; margin-bottom:3px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+</style>`;
+
+const BODY = `<div class="wrap">
+<div class="case caseTop">
+  <div class="top">
+    <div>
+      <p class="eyebrow" id="eyebrow"></p>
+      <h1 id="clubname"></h1>
+      <p class="sub" id="clubsub"></p>
+    </div>
+    <button class="themebtn" id="themebtn" type="button">테마 바꾸기</button>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <nav class="nav" id="nav" role="tablist" aria-label="커리어 고르기">
+    <button class="navbtn" type="button" role="tab" data-v="mgr" aria-selected="true">감독 커리어</button>
+    <button class="navbtn" type="button" role="tab" data-v="club" aria-selected="false">구단 커리어</button>
+    <button class="navbtn" type="button" role="tab" data-v="player" aria-selected="false">선수 커리어</button>
+  </nav>
+</div>
+
+<!-- ══ 감독 커리어 ══════════════════════════════════════════════ -->
+<div class="view" id="v-mgr">
+<div class="case">
+  <div class="caseHead"><span class="snum">1</span><h2>명예의 전당</h2></div>
+  <p class="caseNote" data-need="honours">대회 이름은 <b>명예의전당 캡처</b>에서, 트로피 개수와 연도는 <b>세이브의 컵 이력</b>에서 왔습니다. 둘을 연도와 결과로 맞췄더니 <b>16시즌 중 14시즌</b>이 정확히 일치했습니다.</p>
+  <div class="hof" id="hof"></div>
+  <p class="caseNote" data-need="cupPix" style="margin-top:12px">트로피 사진은 <b>sortitoutsi Trophies Megapack</b> 의 컷아웃입니다. 파일 이름이 곧 <b>대회 번호</b>라서 번호만 알면 사진이 붙습니다 — UEFA 대회는 <b>1301394 챔피언스 리그 · 1301397 슈퍼컵 · 1301398 클럽 월드컵</b> 이었습니다. 사진이 없는 대회는 <b>선으로 그린 트로피</b>로 남깁니다.</p>
+
+  <div class="caseHead"><span class="snum">2</span><h2>국가대표 · 월드컵</h2></div>
+  <p class="caseNote">월드컵 결승은 세이브의 컵 이력에 <b>라운드 473</b>, 아시안 컵은 <b>3221</b> 로 들어 있습니다. 도메스틱 컵과 달리 이 번호는 해마다 바뀌지 않아 대회가 한 줄로 이어집니다. 국가대표팀 번호에 <b>이름을 붙이려면 이름표가 따로</b> 필요합니다 — 없으면 번호로 둡니다.</p>
+  <p class="caseNote" data-need="nations">두 라운드 번호는 화면 캡처의 역대 우승국과 각각 <b>4/4</b> 로 맞춰 확인했습니다.</p>
+  <div class="wc" id="wc"></div>
+  <div class="spells" id="spells"></div>
+  <p class="caseNote" data-need="nations" style="margin-top:10px">재임은 감독 기록표에서 읽었습니다. 국가대표팀 번호 <b>117 대한민국</b> · <b>627 프랑스</b> 는 감독 타임라인 캡처의 재임 기간과 겹쳐서 확인했고, <b>623 잉글랜드</b> · <b>629 독일</b> 은 월드컵 우승국으로 확인했습니다.</p>
+
+  <div class="caseHead"><span class="snum">3</span><h2>감독 수상</h2></div>
+  <p class="caseNote" data-need="awards.players">올해의 감독 상은 <b>승격할 때마다 번호가 바뀝니다</b> — 리그 2 → 리그 1 → 챔피언십 → 프리미어. 그 사다리가 <span class="cn"></span>의 승격 연표와 정확히 맞았고, 한 해에 같은 구단이 둘을 받은 적은 <b>64건 중 0번</b>입니다.</p>
+  <div class="aw-list" id="mgraw"></div>
+</div>
+
+  <section>
+    <div class="shead"><span class="snum">4</span><h2>등반</h2><span class="src sv">세이브</span></div>
+    <p class="sdesc">세이브 하나에 <b>16시즌</b>이 들어 있습니다. 명단이 없는 해도 <b>몇 부에 있었는지는 압니다</b> —
+      그런 시즌은 테두리만 있는 점입니다. 공백을 비워두지 않고 아는 만큼 적었습니다.</p>
+    <div class="card"><div class="scroll"><svg id="ladder" width="1120" height="330" role="img"
+      aria-label="시즌별 소속 디비전과 리그 순위"></svg></div></div>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--accent)"></i>우승</span>
+      <span><i class="sw" style="background:var(--accent-soft);border:1px solid var(--accent)"></i>3위 이내</span>
+      <span><i class="sw" style="background:var(--sunken);border:1px solid var(--line-strong)"></i>그 밖</span>
+      <span><i class="sw" style="background:transparent;border:1.5px dashed var(--ink-3)"></i>명단 없음 · 순위만 안다</span>
+    </div>
+  </section>
+</div>
+
+<!-- ══ 구단 커리어 ══════════════════════════════════════════════ -->
+<div class="view" id="v-club" hidden>
+  <section>
+    <div class="shead"><span class="snum">1</span><h2>시즌별 진열대</h2><span class="src sv">세이브</span></div>
+    <p class="sdesc" data-need="honours">대회 이름은 <b>명예의전당 캡처</b>(2038-10-06)에서 왔고, 트로피 하나하나는 세이브의 컵 이력에서 왔습니다. 둘을 <b>연도 + 결과</b>로 맞췄더니 <b>16시즌 중 14시즌</b>의 결승 횟수가 정확히 일치했습니다. 컵 이력 표에서 <b>결승에 간 것</b>만 골랐습니다. 2팀 라운드에서 한쪽만 표식이 서면
+      그쪽이 준우승, 다른 쪽이 우승입니다 — 명예의전당 캡처와 <b>9/9</b> 로 맞은 판정입니다.</p>
+    <div class="ss-bar">
+      <label for="sspick">시즌 고르기</label>
+      <select class="ss-sel" id="sspick"></select>
+      <div class="ss-nav"><button type="button" id="ssprev" aria-label="이전 시즌">‹</button><button type="button" id="ssnext" aria-label="다음 시즌">›</button></div>
+    </div>
+    <div class="ss-rail" id="ssrail"></div>
+    <p class="note">카드를 <b>누르면</b> 아래에 그 시즌이 펼쳐집니다. 옆으로 넘겨 보세요.</p>
+    <div class="shead" style="margin-top:26px"><span class="snum">·</span><h2 id="panelTitle">시즌</h2><span class="src sv">세이브</span><span class="src ex">내보내기</span></div>
+    <div class="card panel" id="panel"></div>
+    <div class="warn"><b>대회 이름은 세이브 안에 없습니다.</b> 라운드 id 가 해마다 바뀌고(3061 과 3062 가 9시즌에 걸쳐 한 해도 안 겹칩니다), <code>game_db</code> 꼬리의 대회 이름 목록에도 라운드 id 가 하나도 없습니다. 그래서 <b>캡처 한 장</b>이 이름을 줍니다 — 내보내기가 없는 사용자도 트로피 <b>개수와 모양</b>까지는 캡처 없이 봅니다. 안 맞은 2시즌(2032·2033)은 세이브 쪽이 하나씩 적습니다. 상대 구단 이름은 <b>추정</b>이라 근거가 얇으면 안 씁니다.</div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="snum">2</span><h2>시즌 경기력</h2><span class="src sv">세이브</span></div>
+    <p class="sdesc">순위표 아래에 있던 값들입니다. <b>평균평점 · 기대득점 · 기대실점 방어</b>는 어젯밤에 해독한 칸이라
+      여기 처음 나옵니다. 기대실점 방어는 <b>골문이 우리 골키퍼로 다 채워진 시즌에만</b> 냅니다 — 아니면 빈칸입니다.</p>
+    <div class="card"><div class="scroll"><table id="perf"></table></div></div>
+    <p class="note"><b>기대실점 방어</b>는 골키퍼가 막아낸 골의 기댓값입니다. 양수면 기대보다 덜 먹었다는 뜻입니다.
+      <b>xG</b>는 경기당 기대득점(페널티 포함), 괄호는 페널티를 뺀 값입니다.</p>
+  </section>
+
+  <section>
+    <div class="shead"><span class="snum">3</span><h2>최다 출장 · 최다 득점</h2><span class="src sv">세이브</span></div>
+    <p class="sdesc">세이브에 쌓여 있는 <b>커리어 통산</b> 출장·골입니다. 이 구단에서의 기록이 아니라
+      <b>선수 커리어 전체</b>라는 점을 표에 못 박아 뒀습니다 — 아직 구단별로 가르는 칸을 못 찾았습니다.</p>
+    <div class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1px;background:var(--line)">
+      <div style="background:var(--surface)"><div class="scroll"><table id="hofApp"></table></div></div>
+      <div style="background:var(--surface)"><div class="scroll"><table id="hofGoal"></table></div></div>
+    </div>
+  </section>
+</div>
+
+<!-- ══ 선수 커리어 ══════════════════════════════════════════════ -->
+<div class="view" id="v-player" hidden>
+<div class="case">
+  <div class="caseHead"><span class="snum">1</span><h2>개인 수상 · 커리어 진열대</h2></div>
+  <p class="caseNote">수상 기록은 <b>사람에게 UID 가 둘</b>이라는 걸 알아내고서야 열렸습니다. 수상표가 쓰는 번호는 사람 ID 가 아니라 사람 레코드 <b>앞</b>에 숨어 있는 두 번째 번호입니다. 검산은 표에 같이 적힌 <b>나이</b>로 했습니다 — 나이로 역산한 출생연도가 사람 표의 생년과 <b>99.0%</b> 맞습니다(게임 시작 전 기록은 0% 라서 빼 두었습니다).</p>
+  <div class="aw-shelf" id="awshelf"></div>
+  <div class="aw-list" id="awlist"></div>
+  <p class="caseNote" style="margin-top:12px">⚠ 상 <b>이름</b>은 세이브 안에 글자로 없습니다 — 상 관리 구획 1.8MB 를 훑어도 읽을 수 있는 글자가 한 줄도 없습니다. 선수 프로필의 <b>일대기 문단</b>이 받은 상을 이름과 횟수로 적어 주는데, 그걸 표에서 뽑은 (상 번호 → 횟수)와 <b>횟수 · 연도 · 구단</b>으로 맞췄습니다. 일곱 사람 모두 <b>종수와 횟수가 표와 정확히 일치</b>했습니다. 그렇게 <b id="awnamed"></b>종을 붙였고, 남은 것은 무리 안에서 서로 맞바꿔도 모순이 없어 <b>번호로 둡니다</b>.</p>
+
+  <div class="caseHead"><span class="snum">2</span><h2>세계 골든 볼</h2></div>
+  <p class="caseNote">상 359종 전부에 “캡처의 열네 시즌을 모순 없이 세 사람으로 배정할 수 있는가”를 물었더니 <b>통과한 상이 하나뿐</b>이었습니다. 덤으로 표의 연도가 <b>시즌 끝해</b>라는 것도 나왔습니다.</p>
+  <div class="aw-ballon" id="ballon"></div>
+
+  <div class="caseHead"><span class="snum">3</span><h2>포디움</h2></div>
+  <p class="caseNote">수상 레코드는 82바이트인데 우승자 정보는 13바이트뿐이었습니다. <b>82 = 4 + 26 × 3</b> — 머리 뒤에 26바이트짜리 자리가 <b>셋</b>, 곧 1 · 2 · 3위입니다. 검산은 두 가지로 했습니다. 선수 일대기가 적어 준 “세계 골든 볼 2위 2회(Jacobs)”, “3위 1회(Miranda)”가 <b>자리도 횟수도 정확히</b> 맞았고, 나이로 역산한 출생연도가 1위 <b>99.0%</b> · 2위 <b>99.5%</b> · 3위 <b>99.9%</b> 맞습니다(나이를 한 바이트 옆에서 읽으면 3~5%로 무너집니다).</p>
+  <div class="pd-pick" id="pdpick" role="tablist" aria-label="상 고르기"></div>
+  <div class="pd-rail" id="pdrail"></div>
+  <div class="caseHead"><span class="snum">4</span><h2>시즌 베스트 XI</h2></div>
+  <p class="caseNote" data-need="bestxi">베스트 일레븐 표는 <b>정답지가 없어서</b> 세 번 접었던 구획입니다. 세계 올해의 팀 캡처 한 장에 UID2 를 아는 사람이 다섯 있었고, 파일에서 그 다섯이 <b>화면 순서 그대로 27바이트 간격</b>으로 놓여 있었습니다(무작위라면 0곳). 레코드는 <b>연도 + 18자리 × 27 + 꼬리 21</b>. 열고 보니 이 표는 세계 올해의 팀이 아니라 <b>구단마다 · 대회마다 한 줄씩 있는 시즌 베스트 XI</b> 였습니다(프리미어 리그 줄이 해마다 정확히 20개). 경기 · 골은 <b>전 대회 합</b>입니다. 앞 11명이 선발, 뒤 7명이 후보입니다. ⚠ 세계 올해의 팀은 다른 구획에 있습니다 — 아직 못 열었습니다.</p>
+  <div class="xi-bar">
+    <label for="xipick" style="font-size:12px;color:var(--case-ink-2)">시즌</label>
+    <select class="ss-sel" id="xipick"></select>
+    <span id="xihead" style="font-size:13px;color:var(--case-ink)"></span>
+  </div>
+  <div id="xibox"></div>
+  <p class="caseNote" style="margin-top:8px">금테는 <b><span class="cn"></span> 소속으로 오른</b> 자리입니다. 이름 대신 “이름 모름”이 보이는 사람은 <b>은퇴해서 세이브에서 지워진</b> 사람입니다 — 자리 <b id="pdrate"></b>가 이름이 붙고 나머지는 세이브에 사람 자체가 없습니다. 없는 이름을 지어내지 않습니다.</p>
+</div>
+
+  <section>
+    <div class="shead"><span class="snum">5</span><h2>선수단</h2><span class="src sv">세이브 2037-38</span></div>
+    <p class="sdesc" data-need="squad">세이브 쪽이 내보내기보다 두껍습니다 — 유스까지 <b>44명</b>이고 <b>PA(잠재능력)</b>가 붙어 있습니다.
+      막대는 현재능력, 주황 눈금이 잠재능력의 천장입니다.</p>
+    <div class="card"><div class="scroll"><table id="squad"></table></div></div>
+    <div class="warn">PA 값 16종(171·181·191·201·211·221 · 246~255)은 숫자가 아니라 <b>“아직 안 정해졌다”는 코드</b>라
+      천장을 안 그리고 <b>—</b>로 둡니다. 통산 출장·골은 <b>커리어 전체</b>지 이 구단 것이 아닙니다.</div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="snum">6</span><h2>성장 곡선</h2><span class="src ex">내보내기</span><span class="src sv">세이브(천장선)</span></div>
+    <p class="sdesc" data-need="curves">내보내기 12시즌에서 같은 선수를 따라가면 현재능력이 어떻게 자랐는지 보입니다.
+      <b>120명</b>이 세 시즌 이상 남아 있습니다. 아래는 가장 많이 자란 열둘이고,
+      가로 점선은 세이브에서 가져온 <b>잠재능력 천장</b>입니다 — <b>성 + 합류일</b>로 이었고 잘못 이어진 사람은 0명입니다.</p>
+    <div class="card" id="curves" style="padding:16px"></div>
+    <p class="note">천장선이 붙은 사람은 <b id="pacount"></b>명뿐입니다. 나머지는 2037-38 선수단에 없어서
+      (이적·은퇴) 세이브에 PA 가 없습니다. 없는 것을 지어내지 않고 그냥 안 그립니다.</p>
+  </section>
+</div>
+
+  <section>
+    <div class="shead"><span class="snum">·</span><h2>이 화면의 자료가 어디서 왔나</h2></div>
+    <div class="card"><div class="scroll"><table id="prov"></table></div></div>
+    <p class="note">눈금(막대 최대값·색 기준)은 <b>한 출처 안에서만</b> 잡았습니다.
+      섞으면 한쪽 자료가 기준을 가져가 다른 쪽이 조용히 왜곡됩니다 — 예전에 포지션 뎁스맵에서 겪은 일입니다.</p>
+  </section>
+</div>
+<div class="tip" id="tip"></div>`;
+
+const SCRIPT = `<script>
+const D = JSON.parse(document.getElementById("payload").textContent);
+
+/* ★ 없는 칸은 빈 것으로 채운다 (NOTES 114).
+ * payload.js 는 입력이 없는 갈래의 칸을 **아예 안 만든다** — 내보내기가 없으면 timeline 도 squad 도 없다.
+ * 그런데 이 스크립트는 그런 칸을 28곳에서 그냥 읽고 있었고, 하나만 없어도 통째로 죽었다
+ * (확인: 내보내기·캡처 없는 자료로 띄우니 D.timeline.filter 에서 멈췄다).
+ * 여기서 한 번 채우면 28곳을 안 건드려도 된다. **자료가 있으면 아무것도 안 바뀐다**.
+ * ⚠ 빈 칸을 화면에 어떻게 보일지는 여기서 안 정한다 — 그건 배치 문제이고 결정거리다(BACKLOG). */
+for (const k of ["timeline", "squad", "curves", "rosters", "runs", "trophies", "records",
+                 "leagues", "honours", "worldcup", "asiancup", "spells", "podium", "bestxi"])
+  if (!D[k]) D[k] = [];
+if (!D.club) D.club = {};
+if (!D.cupPix) D.cupPix = {};
+if (!D.awards) D.awards = { players: [], golden: [], lee: null, total: 0, winners: 0, kinds: 0, named: 0 };
+
+const $ = (id) => document.getElementById(id);
+
+/* ★ 120: 구단 이름을 한 군데서 받는다. 전에는 본문·스크립트 여덟 곳에 구단 이름이 박혀 있어서
+ * 다른 구단으로 만들면 남의 이야기가 적혔다. 이름을 모르면 "우리 구단" 이라고만 한다 — 지어내지 않는다. */
+const CN = (D.club && (D.club.name || D.club.shortName)) || "우리 구단";
+document.querySelectorAll(".cn").forEach(function (e) { e.textContent = CN; });
+/* 제목은 별명이 있으면 별명으로. 별명이 있는 구단은 예전 제목 그대로가 된다. */
+if (D.club && (D.club.nickname || D.club.name))
+  document.title = (D.club.nickname || D.club.name) + " 연대기";
+
+/* ★ 118: 설명 문단은 **자기가 설명하는 자료가 있을 때만** 남는다.
+ * 세이브만으로 만든 화면에서 명예의 전당 설명이 "16시즌 중 14시즌이 일치했습니다" 라고
+ * 말하고 있었는데, 그 화면엔 그 자료가 한 줄도 없었다. 없는 것을 설명하면 거짓말이 된다.
+ * ⚠ 대신 쓸 문구는 정하지 않았다 — 그건 배치·문안 문제라 사용자 몫이다(BACKLOG). 여기서는 내리기만 한다. */
+/* 칸마다 "무엇이 있어야 나오는가" — 사용자가 손쓸 수 있는 말로 적는다 */
+const NEED_WHY = {
+  honours: "대회 이름을 알려 줄 명예의전당 화면 캡처",
+  cupPix: "트로피 사진 파일",
+  bestxi: "시즌 베스트 XI 자료",
+  squad: "내보낸 팀 파일(.fmf)",
+  curves: "내보낸 팀 파일(.fmf)",
+  nations: "국가대표팀 번호에 붙일 이름표",
+  "awards.players": "수상 이력 구획",
+};
+document.querySelectorAll("[data-need]").forEach(function (el) {
+  var k = el.getAttribute("data-need");
+  /* 점으로 파고든다 — awards 처럼 객체 안의 목록을 가리켜야 할 때가 있다 */
+  var v = D;
+  k.split(".").forEach(function (p) { v = (v == null ? null : v[p]); });
+  var empty = !v || (Array.isArray(v) ? !v.length : (typeof v === "object" ? !Object.keys(v).length : false));
+  if (!empty) return;
+  /* ★ 120: 그냥 내리면 제목만 남고 아래가 빈다. **무엇이 있어야 나오는지** 한 줄로 적는다.
+   * 없는 것을 설명하지도 않고, 빈 자리를 말없이 두지도 않는다. */
+  el.hidden = true;
+  var why = NEED_WHY[k];
+  if (!why) return;
+  var note = document.createElement("p");
+  note.className = el.className.replace(/\bcaseNote\b|\bsdesc\b/, function (m) { return m; });
+  note.style.opacity = "0.65";
+  note.textContent = why + " 없이는 이 칸을 못 채웁니다.";
+  el.parentNode.insertBefore(note, el);
+});
+const el = (t, a, h) => { const n = document.createElement(t);
+  if (a) for (const k in a) n.setAttribute(k, a[k]); if (h != null) n.innerHTML = h; return n; };
+const MISS = '<span class="miss">&mdash;</span>';
+const N = (v, d) => v == null ? MISS
+  : '<span class="num">' + (d != null ? Number(v).toFixed(d) : Number(v).toLocaleString("ko-KR")) + "</span>";
+
+/* PA 미정 코드 — 숫자로 쓰면 안 된다 (NOTES 4-26 ㉑) */
+const PA_UNSET = new Set([171, 181, 191, 201, 211, 221, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255]);
+const paOf = (p) => (p == null || PA_UNSET.has(p)) ? null : p;
+
+/* 잉글랜드 피라미드 — 디비전 번호는 세이브마다 다르지만 잉글랜드는 여러 세이브에서 같았다 */
+const TIER = { 7: 1, 8: 2, 9: 3, 10: 4, 150: 5 };
+const TIERNAME = { 1: "프리미어 리그", 2: "챔피언십", 3: "리그 1", 4: "리그 2", 5: "내셔널 리그" };
+
+/* ★ 이름은 **호칭(별명)**으로 부른다 — 세이브는 성(姓)뿐이라 "Lee" 만 나오면 한국인 선수를 못 가린다.
+ *   내보내기의 localName 을 **성 + 합류일**로 이었다 (유일 32 · 여럿에 걸림 0).
+ *   못 이은 12명(대개 유스)은 성을 쓰고 "(성만)"이라고 적는다 — 지어내지 않는다. */
+const who = (p) => p.local || p.name;
+const whoHtml = (p) => p.local
+  ? p.local + (p.full && p.full !== p.local
+      ? ' <span class="dim" style="font-size:11px;font-weight:400">' + p.full + '</span>' : '')
+  : p.name + ' <span class="dim" style="font-size:11px">(성만 — 내보내기에 없는 선수)</span>';
+
+const POS = { Pgoa: "GK", Pdls: "DL", Pdce: "DC", Pdrs: "DR", Pdmc: "DM", Pmls: "ML", Pmce: "MC",
+  Pmrs: "MR", Paml: "AML", Pamc: "AMC", Pamr: "AMR", Pace: "ST", Pwbl: "WBL", Pwbr: "WBR" };
+
+/* ── 툴팁 ─────────────────────────────────────────────── */
+const tip = $("tip");
+function showTip(e, html) {
+  tip.innerHTML = html; tip.classList.add("on");
+  const r = 14; let x = e.clientX + r, y = e.clientY + r;
+  const b = tip.getBoundingClientRect();
+  if (x + b.width > innerWidth - 8) x = e.clientX - b.width - r;
+  if (y + b.height > innerHeight - 8) y = e.clientY - b.height - r;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+const hideTip = () => tip.classList.remove("on");
+function bindTip(node, html) {
+  node.addEventListener("mousemove", (e) => showTip(e, html));
+  node.addEventListener("mouseleave", hideTip);
+}
+
+/* ── 머리 · 요약 ───────────────────────────────────────── */
+const done = D.timeline.filter((s) => s.standing);
+const titles = done.filter((s) => s.standing.pos === 1).length;
+/* ★ 컵 집계는 **캡처로 보정된 runs** 에서 낸다. D.trophies 는 보정 전 값이라 적게 나온다. */
+const FIN = (D.runs || []).flatMap((x) => x.runs).filter((r) =>
+  r.result === "우승" || r.result === "준우승" || r.result === "결승");
+const cupWin = FIN.filter((r) => r.result === "우승").length;
+const cupLose = FIN.filter((r) => r.result === "준우승").length;
+const cupFin = FIN.length;
+const best = Math.min.apply(null, D.timeline.map((s) => TIER[s.division] || 9));
+
+/* ★ 머리는 **아는 조각만** 찍는다 (NOTES 114).
+ * 내보내기가 없으면 별명·구장·감독·수용 인원이 통째로 없다. 전에는 그대로 이어 붙여
+ * "undefined · undefined" 가 되거나 D.timeline[0] 에서 죽었다. 없는 것은 그냥 빼고 잇는다.
+ * ⚠ 그런 사람한테 머리에 **무엇을** 보여야 하는지는 안 정했다 — 결정거리(BACKLOG). */
+const bits = (a) => a.filter((x) => x != null && x !== "").join(" · ");
+$("eyebrow").textContent = bits([D.club.nickname, D.club.stadium]);
+$("clubname").textContent = D.club.name || "";
+$("clubsub").innerHTML = bits([
+  D.club.manager ? "감독 <b>" + D.club.manager + "</b>" : null,
+  D.timeline.length ? D.timeline[0].season + " ~ " + D.timeline[D.timeline.length - 1].season : null,
+  D.club.capacity != null ? "수용 " + D.club.capacity.toLocaleString("ko-KR") + "명" : null
+]) + '<br><span class="dim">이 화면의 자료는 전부 ' +
+  /* ★ 120: 출처를 **있는 것만** 적는다. 전에는 캡처에서 옮겨 적은 값이 있는데도
+   * "손으로 적은 값은 없습니다" 라고 했다 — 그게 틀린 말이었다.
+   * 대회 이름과 트로피 사진은 화면 캡처를 손으로 옮긴 것이다(NOTES 114·118). */
+  bits([
+    "<b>세이브 파일 한 개</b>",
+    D.rosters.length ? "<b>내보내기 " + D.rosters.length + "시즌</b>" : null,
+    (D.honours.length || Object.keys(D.cupPix).length) ? "<b>화면 캡처</b>" : null
+  ]) +
+  '에서 나왔습니다.' +
+  ((D.honours.length || Object.keys(D.cupPix).length)
+    ? ' 대회 이름과 트로피 사진만 캡처에서 옮겨 적었고, 나머지는 파일에서 읽은 값입니다.'
+    : ' 손으로 적은 값은 없습니다.') + '</span>';
+/* ⚠ 위 문장은 **있는 것만** 말한다 (NOTES 114). 내보내기가 없으면 그 대목을 뺀다 —
+ *   전에는 없는 사람한테도 "내보내기 12시즌" 이라고 적었고, 12 도 박혀 있었다.
+ * ⚠ 아직 남은 문제: 캡처 정답지(대회 이름·트로피 사진)도 "손으로 적은 값"인데 이 문장은 없다고 한다.
+ *   문장을 어떻게 고칠지는 **사용자 몫**이라 손대지 않았다 — 결정거리(BACKLOG). */
+
+/* ★ 없는 것은 0 이 아니라 **모르는 것**이다 (NOTES 114).
+ * 자료가 통째로 없는데 "0" 이라고 적으면 "0이었다"는 없는 사실을 주장하게 된다.
+ * 그래서 밑자료가 아예 없으면 줄표를 쓴다. 자료가 있으면 예전과 똑같이 숫자가 나온다. */
+const or = (has, v, why) => has ? v : "—";
+const tiles = [
+  ["시즌", or(D.timeline.length, D.timeline.length), D.timeline.length ? "이력 표에 남아 있는 해" : "이력 표가 없습니다"],
+  ["리그 우승", or(D.timeline.length, titles),
+    D.timeline.length ? "순위가 확정된 " + done.length + "시즌 중" : "연표가 없어 셀 수 없습니다"],
+  ["컵 우승", cupWin, "결승 " + cupFin + "회 · 준우승 " + cupLose],
+  /* 연표가 없으면 최고 디비전도 출발점도 말할 수 없다 — 지어내지 않고 줄표를 둔다 (NOTES 114) */
+  ["최고 디비전", D.timeline.length ? TIERNAME[best] : "—",
+    D.timeline.length ? "출발은 " + TIERNAME[TIER[D.timeline[0].division]] : "연표가 없습니다"],
+  ["선수단", or(D.squad.length, D.squad.length + "명"), D.squad.length ? "세이브 2037-38 · 유스 포함" : "명단이 없습니다"],
+  ["성장 곡선", or(D.curves.length, D.curves.length + "명"), D.curves.length ? "세 시즌 이상 남은 선수" : "내보내기가 없습니다"],
+  ["대회 종류", or(D.honours.length, D.honours.length + "개"), D.honours.length ? "이름이 붙은 대회" : "대회 이름은 캡처가 있어야 압니다"]
+];
+for (const row of tiles) {
+  const t = el("div", { class: "tile" });
+  t.appendChild(el("div", { class: "k" }, row[0]));
+  const isWord = typeof row[1] === "string" && /[^0-9,명]/.test(row[1]);
+  t.appendChild(el("div", { class: isWord ? "v word" : "v" }, String(row[1])));
+  t.appendChild(el("div", { class: "n" }, row[2]));
+  $("tiles").appendChild(t);
+}
+
+const NS = "http://www.w3.org/2000/svg";
+const mk = (t, a) => { const n = document.createElementNS(NS, t);
+  for (const k in a) n.setAttribute(k, a[k]); return n; };
+
+/* ── ① 등반 ───────────────────────────────────────────── */
+(function ladder() {
+  const svg = $("ladder"), W = 1120, H = 330, L = 96, R = 24, T = 26, B = 46;
+  const xs = (i) => L + i * (W - L - R) / (D.timeline.length - 1);
+  const ys = (t) => T + (t - 1) * (H - T - B) / 4;
+
+  for (let t = 1; t <= 5; t++) {
+    svg.appendChild(mk("line", { x1: L, x2: W - R, y1: ys(t), y2: ys(t),
+      stroke: "var(--line)", "stroke-width": 1 }));
+    const lb = mk("text", { x: L - 12, y: ys(t) + 4, "text-anchor": "end", "font-size": 11 });
+    lb.textContent = TIERNAME[t]; svg.appendChild(lb);
+  }
+
+  const pts = D.timeline.map((s, i) => ({ s: s, x: xs(i), y: ys(TIER[s.division] || 5) }));
+  const solid = pts.filter((p) => p.s.standing);
+  /* 선 아래를 옅게 채우면 "올라온 이야기"가 한눈에 보인다 */
+  if (solid.length) {
+    const base = ys(5) + 6;
+    svg.appendChild(mk("path", { d: "M" + solid[0].x + " " + base + " L" +
+      solid.map((p) => p.x + " " + p.y).join(" L") + " L" + solid[solid.length - 1].x + " " + base + " Z",
+      fill: "var(--accent)", opacity: 0.07, stroke: "none" }));
+  }
+  svg.appendChild(mk("polyline", { points: solid.map((p) => p.x + "," + p.y).join(" "),
+    fill: "none", stroke: "var(--accent)", "stroke-width": 2,
+    "stroke-linejoin": "round", "stroke-linecap": "round", opacity: 0.55 }));
+
+  for (const p of pts) {
+    const st = p.s.standing;
+    let fill = "var(--sunken)", stroke = "var(--line-strong)";
+    if (st && st.pos === 1) { fill = "var(--accent)"; stroke = "var(--accent)"; }
+    else if (st && st.pos <= 3) { fill = "var(--accent-soft)"; stroke = "var(--accent)"; }
+    if (!st) { fill = "transparent"; stroke = "var(--ink-3)"; }
+    const c = mk("circle", { cx: p.x, cy: p.y, r: 9, fill: fill, stroke: stroke, "stroke-width": 2 });
+    if (!p.s.hasSquad) c.setAttribute("stroke-dasharray", "3 2.5");
+    svg.appendChild(c);
+
+    if (st) {
+      const n = mk("text", { x: p.x, y: p.y + 4, "text-anchor": "middle", "font-size": 10.5,
+        "font-weight": 600, fill: st.pos === 1 ? "#fff" : (st.pos <= 3 ? "var(--accent)" : "var(--ink-2)") });
+      n.textContent = st.pos; svg.appendChild(n);
+    }
+    const yr = mk("text", { x: p.x, y: H - 22, "text-anchor": "middle", "font-size": 10 });
+    yr.textContent = p.s.season.slice(2); svg.appendChild(yr);
+    if (p.s.cups.win) {
+      const tr = mk("text", { x: p.x, y: H - 7, "text-anchor": "middle", "font-size": 10,
+        fill: "var(--s4)", "font-weight": 600 });
+      tr.textContent = "●".repeat(Math.min(p.s.cups.win, 4)); svg.appendChild(tr);
+    }
+
+    const cupLine = p.s.cups.finals
+      ? "<br>결승 " + p.s.cups.finals + "회 (우승 " + p.s.cups.win + " · 준우승 " + p.s.cups.lose +
+        " · 결과 미상 " + p.s.cups.unk + ")"
+      : "";
+    const standLine = st
+      ? st.pos + "위 / " + st.teams + "팀 · " + st.played + "경기 " + st.w + "승 " + st.d + "무 " +
+        st.l + "패<br>득실 " + st.gf + ":" + st.ga + " · 승점 " + st.pts
+      : '<span class="miss">순위를 못 찾았다 — ' + (p.s.why || "") + "</span>";
+    const squadLine = p.s.hasSquad
+      ? "<br>명단 " + p.s.squadSize + "명"
+      : (p.s.squadSize
+      /* ★ 120: 내보내기가 없어도 **몇 명이었는지는** 세이브가 안다(이름은 모른다).
+       * 아는 것을 안 보이는 것도 정직하지 않아서, 수만 보이고 이름은 모른다고 적는다. */
+      ? '<br>명단 ' + p.s.squadSize + '명 <span class="miss">(이름은 모른다 — 내보내기가 있어야 한다)</span>'
+      : '<br><span class="miss">명단 없음 — 리그만 안다</span>');
+    bindTip(c, "<b>" + p.s.season + " · " + p.s.divName + "</b>" + standLine + cupLine + squadLine +
+      "<br><span class=\\"dim\\">눌러서 이 시즌 펼치기</span>");
+    c.style.cursor = "pointer";
+    c.addEventListener("click", () => { pickSeason(p.s.season);
+      const t = document.getElementById("panelTitle");
+      if (t) t.scrollIntoView({ behavior: "smooth", block: "center" }); });
+  }
+  /* 디비전이 올라간 해에 화살표 — 승격은 이 구단 이야기의 뼈대다 */
+  for (let i = 1; i < pts.length; i++) {
+    if (pts[i].y >= pts[i - 1].y) continue;
+    const mx = (pts[i - 1].x + pts[i].x) / 2, my = (pts[i - 1].y + pts[i].y) / 2;
+    const t = mk("text", { x: mx + 13, y: my + 4, "font-size": 9.5, fill: "var(--good)", "font-weight": 600 });
+    t.textContent = "승격"; svg.appendChild(t);
+  }
+  const cap = mk("text", { x: L - 12, y: H - 7, "text-anchor": "end", "font-size": 10, fill: "var(--s4)" });
+  cap.textContent = "컵 우승"; svg.appendChild(cap);
+})();
+
+/* ── ② 트로피 진열대 ─────────────────────────────────────
+ * 트로피 **모양**은 지어낸 게 아니라 자료다: 그 대회를 **몇 팀에서 시작했나**로 고른다.
+ *   2팀뿐  = 단판 대회(실드·슈퍼컵류) -> 방패
+ *   ~8팀   = 작은 컵      ~32팀 = 컵      33팀+ = 큰 컵
+ * 한 대회의 여정(run)은 라운드 id 근접 + **팀 수 단조 감소**로 묶었다 (65묶음 전부 단조).
+ * ⚠ 대회 **이름**은 여전히 못 붙인다 — 라운드 id 가 해마다 바뀐다 (NOTES 78). */
+const FOE_MIN = 0.25;
+const GOLD = "var(--s4)", SILV = "var(--ink-3)", GHOST = "var(--line-strong)";
+const CASEGOLD = "var(--gold)";
+
+/* 대회마다 트로피 실루엣을 달리 그린다. 실제 트로피 생김새를 보고 **직접 그린 도형**이고
+ * 게임 이미지를 가져다 쓰지 않는다. 이름을 모르는 대회는 규모(from)로 고른다. */
+const SHAPES = {
+  "UCL":        "ears",     /* 손잡이가 크게 휜 컵 */
+  "FA컵":       "tall",     /* 뚜껑과 꼭지가 있는 긴 컵 */
+  "카라바오":    "squat",    /* 낮고 넓은 컵 */
+  "채리티 쉴드": "shield",   /* 방패 */
+  "슈퍼컵":     "slim",     /* 가늘고 높은 컵 */
+  "클럽월드컵":  "globe",    /* 받침 위의 공 */
+  "EFL 트로피":  "plate"     /* 얕은 접시 */
+};
+/* 진열대는 대회를 **짧은 이름**으로 부른다. 사진은 긴 이름으로 들어 있어 다리를 놓는다. */
+const PIC_OF = {
+  "UCL": "UEFA 챔피언스 리그", "FA컵": "잉글랜드 FA 컵", "카라바오": "잉글랜드 카라바오 컵",
+  "채리티 쉴드": "잉글랜드 채리티 쉴드", "슈퍼컵": "UEFA 슈퍼컵",
+  "클럽월드컵": "세계 클럽 선수권 대회", "EFL 트로피": "브리스톨 스트리트 모터스 트로피",
+};
+const cupPic = (run) => {
+  const P2 = D.cupPix || {};
+  return (run.comp && P2[run.comp]) || (run.short && P2[PIC_OF[run.short]]) || null;
+};
+function shapeOf(run) {
+  if (run.short && SHAPES[run.short]) return SHAPES[run.short];
+  return run.from <= 2 ? "shield" : run.from > 32 ? "tall" : "squat";
+}
+function trophyPath(kind, col, fill, op, add) {
+  const cx = 17;
+  if (kind === "shield") {
+    add("path", { d: "M6 6 H28 V19 C28 29 22 34 17 37 C12 34 6 29 6 19 Z", fill: fill });
+    add("path", { d: "M11 14 H23" });
+  } else if (kind === "ears") {
+    add("path", { d: "M9 6 H25 V15 C25 22 21 25 17 25 C13 25 9 22 9 15 Z", fill: fill });
+    add("path", { d: "M9 7 C1 7 1 21 8.5 22" });
+    add("path", { d: "M25 7 C33 7 33 21 25.5 22" });
+    add("path", { d: "M17 25 V30" });
+    add("path", { d: "M9 33 H25", "stroke-width": 2.6 });
+    add("path", { d: "M12 30 H22" });
+  } else if (kind === "tall") {
+    add("path", { d: "M11 9 H23 V22 C23 27 20 29 17 29 C14 29 11 27 11 22 Z", fill: fill });
+    add("path", { d: "M11 5 H23 L21 9 H13 Z", fill: fill });
+    add("circle", { cx: cx, cy: 3, r: 1.6, fill: fill });
+    add("path", { d: "M11 12 C6 12 6 21 10.5 22" });
+    add("path", { d: "M23 12 C28 12 28 21 23.5 22" });
+    add("path", { d: "M17 29 V33" });
+    add("path", { d: "M10 35 H24", "stroke-width": 2.6 });
+  } else if (kind === "squat") {
+    add("path", { d: "M8 11 H26 V19 C26 25 22 27 17 27 C12 27 8 25 8 19 Z", fill: fill });
+    add("path", { d: "M8 12 C3 12 3 20 7.5 21" });
+    add("path", { d: "M26 12 C31 12 31 20 26.5 21" });
+    add("path", { d: "M17 27 V31" });
+    add("path", { d: "M9 33 H25", "stroke-width": 2.6 });
+  } else if (kind === "slim") {
+    add("path", { d: "M12 6 H22 V20 C22 25 20 27 17 27 C14 27 12 25 12 20 Z", fill: fill });
+    add("path", { d: "M12 9 C8 9 8 18 11.5 19" });
+    add("path", { d: "M22 9 C26 9 26 18 22.5 19" });
+    add("path", { d: "M17 27 V32" });
+    add("path", { d: "M11 34 H23", "stroke-width": 2.6 });
+  } else if (kind === "globe") {
+    add("circle", { cx: cx, cy: 15, r: 9, fill: fill });
+    add("path", { d: "M8 15 H26" });
+    add("path", { d: "M17 6 C12 10 12 20 17 24 C22 20 22 10 17 6" });
+    add("path", { d: "M17 24 V29" });
+    add("path", { d: "M10 33 H24", "stroke-width": 2.6 });
+  } else {                                  /* plate */
+    add("path", { d: "M6 13 H28 C28 21 23 25 17 25 C11 25 6 21 6 13 Z", fill: fill });
+    add("path", { d: "M6 13 H28" });
+    add("path", { d: "M17 25 V29" });
+    add("path", { d: "M10 32 H24", "stroke-width": 2.6 });
+  }
+}
+
+function trophySVG(run, kind) {
+  /* kind: win | lose | final */
+  const col = kind === "win" ? GOLD : kind === "lose" ? SILV : GHOST;
+  const fill = kind === "win" ? GOLD : "none";
+  const op = kind === "final" ? 0.7 : 1;
+  const W = 34, H = 42;
+  const g = mk("svg", { viewBox: "0 0 " + W + " " + H, width: W, height: H, role: "img" });
+  g.setAttribute("aria-label", (kind === "win" ? "우승" : kind === "lose" ? "준우승" : "결승 진출") + " 트로피");
+  const add = (t, a) => g.appendChild(mk(t, Object.assign({ stroke: col, "stroke-width": 1.6,
+    fill: "none", "stroke-linejoin": "round", "stroke-linecap": "round", opacity: op }, a)));
+  trophyPath(shapeOf(run), col, fill, op, add);
+  return g;
+}
+
+const SHAPE = (n) => n <= 2 ? "단판" : n <= 8 ? String(n) + "팀" : String(n) + "팀";
+
+function goods(run) {
+  const kind = run.result === "우승" ? "win" : run.result === "준우승" ? "lose"
+    : run.result === "결승" ? "final" : null;
+  if (!kind) return null;                     /* 결승에 못 간 여정은 진열 안 한다 */
+  const d = el("div", { class: "good" });
+  const pic = cupPic(run);
+  if (pic) {
+    /* 우승은 그대로, 준우승은 회색, 결승 진출은 더 흐리게 — 선화 때 쓰던 구분을 그대로 옮긴다 */
+    d.appendChild(el("img", { class: "cuppic " + kind, src: pic, loading: "lazy",
+      alt: (run.comp || run.short || "대회") + " " + run.result + " 트로피" }));
+  } else d.appendChild(trophySVG(run, kind));
+  d.appendChild(el("div", { class: "cap nm" }, run.short || (run.from + "팀")));
+  d.appendChild(el("div", { class: "cap" }, run.result));
+  const foe = FOEOF(run.foe);
+  bindTip(d, "<b>" + (run.comp || "대회 미상") + " · " + run.result + "</b>" +
+    run.from + "팀에서 시작 · " +
+    (run.from === run.to ? "단판 대회다 (실드·슈퍼컵류)" : run.from + "강부터 " + (run.to === 2 ? "결승" : run.to + "강") + "까지") +
+    (foe ? "<br>상대 추정 <b>" + foe.name + "</b> (근거 " + Math.round(foe.conf * 100) + "%)" : "") +
+    (run.byCapture ? "<br><span class=\\"dim\\">결과는 명예의전당 캡처가 알려줬다</span>" : "") +
+    "<br><span class=\\"dim\\">이름: 명예의전당 캡처 · 트로피: 세이브의 컵 이력</span>");
+  return d;
+}
+
+/* 상대 이름은 진열대 자료(trophies)에 들어 있다 — run 과 연도·상대번호로 잇는다 */
+const FOEMAP = new Map();
+if (D.trophies) for (const s of D.trophies) for (const it of s.items)
+  if (it.foe && it.foeName) FOEMAP.set(it.foe, it.foeName);
+const FOEOF = (t) => { const v = t ? FOEMAP.get(t) : null; return v && v.conf >= FOE_MIN ? v : null; };
+
+/* ── 시즌 캐러셀 (사용자 안) ─────────────────────────
+ * 시즌마다 카드 하나. 고르면 아래 패널이 바뀐다 — 고르는 일은 pickSeason 이 그대로 한다. */
+(function cabinet() {
+  const rail = $('ssrail'), sel = $('sspick');
+  if (!rail || !D.runs) return;
+  /* BYSEASON 은 아래에서 만들어진다 — 여기서는 타임라인으로 직접 짠다 */
+  const LINE = new Map();
+  for (const t of (D.timeline || [])) LINE.set(t.season, t);
+  for (const s2 of D.runs) {
+    const line = LINE.get(s2.season);
+    const c = el('button', { class: 'ss-card', type: 'button', 'data-s': s2.season });
+    c.appendChild(el('div', { class: 'ss-y' }, s2.season));
+    c.appendChild(el('div', { class: 'ss-div' }, (line && line.divName) || '디비전 모름'));
+    const st = line && line.standing;
+    const pos = el('div', { class: 'ss-pos' + (st && st.pos === 1 ? ' win' : '') },
+      st ? st.pos + '위' : '—');
+    c.appendChild(pos);
+    /* 그 시즌 트로피 — 진열대와 같은 판정(우승·준우승·결승) */
+    const cups = el('div', { class: 'ss-cups' });
+    let n = 0;
+    for (const run of s2.runs) {
+      const kind = run.result === '우승' ? 'win' : run.result === '준우승' ? 'lose'
+        : run.result === '결승' ? 'final' : null;
+      if (!kind) continue;
+      n++;
+      const pic = cupPic(run);
+      if (pic) cups.appendChild(el('img', { class: kind, src: pic, loading: 'lazy',
+        alt: (run.comp || run.short || '대회') + ' ' + run.result }));
+      else cups.appendChild(trophySVG(run, kind));
+    }
+    if (!n) cups.appendChild(el('span', { class: 'none' }, '결승 없음'));
+    c.appendChild(cups);
+    const wins = s2.runs.filter(function (r) { return r.result === '우승'; }).length;
+    c.appendChild(el('div', { class: 'ss-n' }, wins ? '우승 ' + wins + '개' : (n ? '결승 ' + n + '회' : ' ')));
+    c.addEventListener('click', function () { pickSeason(s2.season); });
+    rail.appendChild(c);
+    sel.appendChild(el('option', { value: s2.season }, s2.season));
+  }
+  sel.addEventListener('change', function () { pickSeason(sel.value); });
+  const step = (d) => { const ss = D.runs.map(function (x) { return x.season; });
+    const i = ss.indexOf(sel.value); const j = Math.min(ss.length - 1, Math.max(0, i + d));
+    if (j !== i) pickSeason(ss[j]); };
+  const pv = $('ssprev'), nx = $('ssnext');
+  if (pv) pv.addEventListener('click', function () { step(-1); });
+  if (nx) nx.addEventListener('click', function () { step(1); });
+})();
+
+/* ── 명예의전당 — 대회별로 모은 것 (캡처가 준 이름 + 세이브가 준 개수) ── */
+(function honours() {
+  const box = $("hof");
+  if (!box || !D.honours) return;
+  const shapeFor = (short) => SHAPES[short] || "squat";
+  for (const c of D.honours.concat((D.leagues || []).filter((l) => (l.win || []).length)
+      .map((l) => ({ name: l.name, short: null, win: l.win, lose: l.lose || [], league: true })))) {
+    const d = el("div");
+    /* ★ 실물 사진이 있으면 그것을 쓴다 (93). 없으면 지금까지 그리던 선화(線畵) 그대로. */
+    const pic = (D.cupPix || {})[c.name];
+    if (pic) {
+      const im = el("img", { class: "cupimg", src: pic, alt: c.name + " 트로피", loading: "lazy" });
+      d.appendChild(im);
+    } else {
+      const sv = mk("svg", { viewBox: "0 0 34 42", width: 40, height: 49, role: "img" });
+      sv.setAttribute("aria-label", c.name + " 트로피");
+      const add = (t, a) => sv.appendChild(mk(t, Object.assign({ stroke: CASEGOLD, "stroke-width": 1.6,
+        fill: "none", "stroke-linejoin": "round", "stroke-linecap": "round" }, a)));
+      trophyPath(c.league ? "plate" : shapeFor(c.short), CASEGOLD, CASEGOLD, 1, add);
+      d.appendChild(sv);
+    }
+    const t = el("div", { class: "txt" });
+    t.appendChild(el("div", { class: "t" }, c.name));
+    t.appendChild(el("div", { class: "cnt" }, "우승 " + c.win.length));
+    t.appendChild(el("div", { class: "n" }, c.win.join(" · ")));
+    if (c.lose && c.lose.length)
+      t.appendChild(el("div", { class: "n" }, "준우승 " + c.lose.length + " — " + c.lose.join(" · ")));
+    d.appendChild(t);
+    box.appendChild(d);
+  }
+})();
+
+/* ── 국가대표 · 월드컵 (NOTES 78) ─────────────────────────
+ * ⚠ 이름을 못 붙인 국가대표팀은 **번호 그대로** 둔다. 지어내지 않는다. */
+(function national() {
+  const box = $("wc");
+  if (box && D.worldcup) {
+    const rows = D.worldcup.map((w) => Object.assign({ comp: '월드컵' }, w))
+      .concat((D.asiancup || []).map((w) => Object.assign({ comp: '아시안 컵' }, w)))
+      .sort((a, c) => a.year - c.year || (a.comp === '월드컵' ? -1 : 1));
+    for (const w of rows) {
+      /* ★ 120: 전에는 "대한민국이고 2032년 이후"라고 박혀 있었다. 이제 **감독 재임 기록**으로 판정한다 —
+     * 우승한 팀이 그 해에 내가 맡고 있던 팀이면 내 것이다. 세이브가 다르면 다른 나라가 나온다. */
+    const mine = (D.spells || []).some(function (sp) {
+      return sp.team === w.win && w.year >= sp.from && w.year <= sp.to;
+    });
+      const d = el("div", { class: "yr" + (mine ? " mine" : "") });
+      const yl = el("div", { class: "y" }, w.year + " "); yl.appendChild(el("span", { class: w.comp === '아시안 컵' ? 'ac' : '' }, w.comp)); d.appendChild(yl);
+      d.appendChild(el("div", { class: "w" }, w.winName || ("팀 " + w.win)));
+      d.appendChild(el("div", { class: "l" }, "준우승 " + (w.loseName || ("팀 " + w.lose))));
+      bindTip(d, "<b>" + w.year + " " + w.comp + "</b>우승 " + (w.winName || ("이름 모르는 팀 " + w.win)) +
+        "<br>준우승 " + (w.loseName || ("이름 모르는 팀 " + w.lose)) +
+        (mine ? "<br><span class=\\"dim\\">이 감독이 맡고 있던 팀입니다</span>" : ""));
+      box.appendChild(d);
+    }
+  }
+  const sp = $("spells");
+  if (sp && D.spells) {
+    for (const x of D.spells) {
+      if (x.years < 2) continue;                 /* 한 해만 스친 번호는 잡음이다 (4-26 ㉔) */
+      const nat = x.name && x.name !== CN;
+      const e = el("span", { class: "spell" + (nat ? " nat" : "") });
+      e.innerHTML = "<b>" + (x.name || ("팀 " + x.team)) + "</b> " + x.from + "–" + x.to;
+      bindTip(e, "<b>" + (x.name || ("팀 " + x.team)) + "</b>기록이 남은 해 " + x.years + "개 (" + x.from + "~" + x.to + ")" +
+        "<br><span class=\\"dim\\">감독 기록은 사건 단위라 재임 기간이 아니라 '그해 기록이 있었다'는 뜻입니다</span>");
+      sp.appendChild(e);
+    }
+  }
+})();
+
+/* ── 개인 수상 · 커리어 진열대 (NOTES 86·87·88) ──────────
+ * ⚠ 이름 못 붙인 상은 **번호로 두고 화면에 안 쓴다**. 지어내지 않는다. */
+(function awards() {
+  const A = D.awards; if (!A) return;
+  const sl = (y) => (y - 1) + '-' + String(y % 100).padStart(2, '0');
+
+  /* 진열대 — 기준 선수의 시즌별 수상 */
+  const sh = $('awshelf');
+  if (sh && A.lee && A.lee.years.length) {
+    const L = A.lee, ys = L.years;
+    const top = el('div', { class: 'aw-top' });
+    top.appendChild(el('span', { class: 'aw-nm' }, L.name || '기준 선수'));
+    top.appendChild(el('span', { class: 'aw-st' },
+      '커리어 전체 <b>' + L.total + '</b>회 · 상 <b>' + L.kinds + '</b>종 · <b>' +
+      sl(ys[0].year) + '</b> ~ <b>' + sl(ys[ys.length - 1].year) + '</b>'));
+    const g = ys.filter(function (y) { return y.named.indexOf('세계 골든 볼') >= 0; }).length;
+    if (g) top.appendChild(el('span', { class: 'aw-st' }, '세계 골든 볼 <b>' + g + '</b>회'));
+    sh.appendChild(top);
+    const strip = el('div', { class: 'aw-strip' });
+    const max = Math.max.apply(null, ys.map(function (y) { return y.n; }));
+    for (const y of ys) {
+      const c = el('div', { class: 'aw-col' + (y.n === max ? ' max' : '') });
+      c.appendChild(el('div', { class: 'aw-y' }, sl(y.year)));
+      const pips = el('div', { class: 'aw-pips' });
+      for (let i = 0; i < y.n; i++)
+        pips.appendChild(el('i', { class: 'aw-pip' + (i < y.named.length ? ' on' : '') }));
+      c.appendChild(pips);
+      c.appendChild(el('div', { class: 'aw-n' }, String(y.n)));
+      bindTip(c, '<b>' + sl(y.year) + ' · ' + y.age + '세</b>수상 ' + y.n + '회' +
+        (y.named.length ? '<br>' + y.named.join('<br>') : '') +
+        '<br><span class=\\'dim\\'>이름을 아는 상만 금색입니다</span>');
+      strip.appendChild(c);
+    }
+    sh.appendChild(strip);
+  }
+
+  /* 수상자 명단 — 이름을 못 붙인 사람은 싣지 않는다 */
+  const box = $('awlist'), mbox = $('mgraw');
+  if (box && A.players) {
+    const max = A.players[0] ? A.players[0].total : 1;
+    for (const p of A.players) {
+      if (!p.name) continue;
+      const into = p.manager ? mbox : box;      /* 감독은 감독 화면으로 */
+      if (!into) continue;
+      const d = el('div', { class: 'aw-row' + (p.manager ? ' mgr' : '') });
+      d.appendChild(el('div', { class: 'aw-r1' }, p.name + (p.manager ? ' <span class=\\'aw-chip\\'>감독</span>' : '')));
+      d.appendChild(el('div', { class: 'aw-r2' }, CN + ' ' + p.total + '회 · ' + p.kinds + '종 · ' + sl(p.from) + '~' + sl(p.to)));
+      const bar = el('div', { class: 'aw-bar' });
+      const fill = el('i');
+      fill.style.width = Math.max(3, 100 * p.total / max) + '%';
+      bar.appendChild(fill);
+      d.appendChild(bar);
+      const ch = el('div', { class: 'aw-chips' });
+      for (const n of p.named) ch.appendChild(el('span', { class: 'aw-chip' }, n.name + (n.n > 1 ? ' ×' + n.n : '')));
+      const rest = p.kinds - p.named.length;
+      if (rest > 0) ch.appendChild(el('span', { class: 'aw-chip q' }, '이름 모르는 상 ' + rest + '종'));
+      d.appendChild(ch);
+      bindTip(d, '<b>' + p.name + '</b>' + CN + '에서 받은 개인 수상 ' + p.total + '회 (' + p.kinds + '종)' +
+        '<br>' + p.perYear.map(function (x) { return sl(x[0]) + ' ' + x[1] + '회'; }).join(' · '));
+      into.appendChild(d);
+    }
+    const nn = $('awnamed'); if (nn) nn.textContent = String(A.named);
+  }
+
+  /* 세계 골든 볼 계보 */
+  const bl = $('ballon');
+  if (bl && A.golden) {
+    for (const r of A.golden) {
+      const d = el('div', { class: 'aw-bal' + (r.mine ? ' mine' : '') });
+      d.appendChild(el('span', { class: 'aw-by' }, sl(r.year)));
+      d.appendChild(el('span', { class: 'aw-bw' }, r.name));
+      bindTip(d, '<b>' + sl(r.year) + ' 세계 골든 볼</b>' + r.name + ' · ' + r.age + '세' +
+        (r.mine ? '<br><span class=\\'dim\\'>' + CN + ' 소속으로 받았습니다</span>' : ''));
+      bl.appendChild(d);
+    }
+  }
+})();
+
+/* ── 포디움 (NOTES 91) ───────────────────────────────────
+ * ⚠ 이름을 못 붙인 사람은 **번호 그대로** 보인다. 은퇴하면 세이브에서 지워진다(89). */
+(function podium() {
+  const L = D.podium; if (!L || !L.length) return;
+  const pick = $('pdpick'), rail = $('pdrail');
+  if (!pick || !rail) return;
+  const sl = (y) => (y - 1) + '-' + String(y % 100).padStart(2, '0');
+  const RK = ['1', '2', '3'];
+  let cur = 0;
+  /* 상 이름에 대회가 들어 있으면 그 트로피를 같이 보인다. 없으면 안 보인다. */
+  const AW_PIC = [
+    [/유럽 챔피언스 리그/, "UEFA 챔피언스 리그"], [/월드컵/, "월드컵"],
+    [/세계 클럽 선수권/, "세계 클럽 선수권 대회"], [/프리미어 리그/, "잉글랜드 프리미어 리그"],
+    [/챔피언쉽/, "잉글랜드 스카이 벳 챔피언쉽"], [/리그 1/, "잉글랜드 스카이 벳 리그 1"],
+    [/리그 2/, "잉글랜드 스카이 벳 리그 2"],
+  ];
+  const head = el('div', { class: 'pd-title' });
+  rail.parentNode.insertBefore(head, rail);
+  function draw(i) {
+    cur = i;
+    head.textContent = '';
+    const nm = L[i].name;
+    const hit = AW_PIC.find(function (x) { return x[0].test(nm); });
+    const pic = hit && (D.cupPix || {})[hit[1]];
+    if (pic) head.appendChild(el('img', { src: pic, alt: hit[1] + ' 트로피', loading: 'lazy' }));
+    head.appendChild(el('b', null, nm));
+    head.appendChild(el('span', null, L[i].seasons.length + '시즌'));
+    for (const t of pick.children) t.setAttribute('aria-selected', String(+t.dataset.i === i));
+    rail.textContent = '';
+    for (const s2 of L[i].seasons) {
+      const mine = s2.p.some(function (q) { return q && q.mine; });
+      const c = el('div', { class: 'pd-card' + (mine ? ' mine' : '') });
+      c.appendChild(el('div', { class: 'pd-yr' }, sl(s2.y)));
+      let any = false;
+      s2.p.forEach(function (q, k) {
+        if (!q) return;
+        any = true;
+        const r = el('div', { class: 'pd-row' + (k === 0 ? ' top' : '') + (q.mine ? ' mine' : '') });
+        r.appendChild(el('span', { class: 'pd-rk g' + (k + 1) }, RK[k]));
+        const unk = /^UID2 /.test(q.name) || /^사람\\d/.test(q.name);
+        r.appendChild(el('span', { class: 'pd-nm' + (unk ? ' unk' : '') },
+          unk ? '이름 모름' : q.name));
+        r.appendChild(el('span', { class: 'pd-ag' }, q.age ? q.age + '세' : ''));
+        bindTip(r, '<b>' + sl(s2.y) + ' · ' + L[i].name + '</b>' + RK[k] + '위 ' + q.name +
+          (q.age ? ' · ' + q.age + '세' : '') +
+          (q.mine ? '<br><span class=\\'dim\\'>' + CN + ' 소속</span>' : '') +
+          (unk ? '<br><span class=\\'dim\\'>은퇴해서 세이브에서 지워진 사람입니다</span>' : ''));
+        c.appendChild(r);
+      });
+      if (!any) c.appendChild(el('div', { class: 'pd-none' }, '수상 없음'));
+      rail.appendChild(c);
+    }
+    rail.scrollLeft = rail.scrollWidth;      /* 가장 최근 시즌이 먼저 보이게 */
+  }
+  /* 이름이 붙은 자리 비율 — 화면에 정직하게 적는다 */
+  (function () { let n = 0, ok = 0;
+    for (const a of L) for (const s2 of a.seasons) for (const q of s2.p) {
+      if (!q) continue; n++;
+      if (!/^UID2 /.test(q.name) && !/^사람\\d/.test(q.name)) ok++; }
+    const e = $('pdrate'); if (e && n) e.textContent = (100 * ok / n).toFixed(0) + '%';
+  })();
+  L.forEach(function (a, i) {
+    const t = el('button', { class: 'pd-tab', type: 'button', role: 'tab', 'aria-selected': 'false' }, a.name);
+    t.dataset.i = String(i);
+    t.addEventListener('click', function () { draw(i); });
+    pick.appendChild(t);
+  });
+  draw(0);
+})();
+
+/* ── 시즌 상세 패널 ─────────────────────────────────────── */
+const BYSEASON = {
+  line: new Map(D.timeline.map((s) => [s.season, s])),
+  run: new Map((D.runs || []).map((s) => [s.season, s])),
+  rec: new Map((D.records || []).map((s) => [s.season, s])),
+  ros: new Map((D.rosters || []).map((s) => [s.season, s]))
+};
+function pickSeason(season) {
+  const t = BYSEASON.line.get(season), r = BYSEASON.run.get(season),
+    rc = BYSEASON.rec.get(season), ro = BYSEASON.ros.get(season);
+  $("panelTitle").textContent = season + " 시즌";
+  const p = $("panel");
+  p.innerHTML = "";
+  /* 카드 캐러셀 — 고른 카드를 켜고 보이는 데까지 밀어 준다 */
+  document.querySelectorAll(".ss-card.on").forEach((n) => n.classList.remove("on"));
+  const card = document.querySelector('.ss-card[data-s="' + season + '"]');
+  if (card) { card.classList.add("on");
+    card.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" }); }
+  const sel = document.getElementById("sspick");
+  if (sel && sel.value !== season) sel.value = season;
+
+  /* ① 리그 */
+  const c1 = el("div");
+  c1.appendChild(el("h3", null, "리그"));
+  if (t && t.standing) {
+    const st = t.standing;
+    c1.appendChild(el("div", { class: "big" }, st.pos + "위"));
+    c1.appendChild(el("div", { class: "dim", style: "font-size:12px;margin-bottom:10px" },
+      t.divName + " · " + st.teams + "팀"));
+    const dl = el("dl", { class: "kv" });
+    dl.innerHTML = "<dt>경기</dt><dd>" + st.played + "</dd>" +
+      "<dt>승 · 무 · 패</dt><dd>" + st.w + " · " + st.d + " · " + st.l + "</dd>" +
+      "<dt>득점 · 실점</dt><dd>" + st.gf + " · " + st.ga + "</dd>" +
+      "<dt>승점</dt><dd><b>" + st.pts + "</b></dd>";
+    c1.appendChild(dl);
+  } else {
+    c1.appendChild(el("div", { class: "miss" }, (t && t.why) || "순위를 못 찾았다"));
+    if (t) c1.appendChild(el("div", { class: "dim", style: "font-size:12px;margin-top:6px" },
+      t.divName + "에 있었다는 것은 안다"));
+  }
+  p.appendChild(c1);
+
+  /* ② 진열대 */
+  const c2 = el("div");
+  c2.appendChild(el("h3", null, "그 해의 진열대"));
+  const cab = el("div", { class: "cabinet" });
+  const its = r ? r.runs.map(goods).filter(Boolean) : [];
+  if (its.length) for (const it of its) cab.appendChild(it);
+  else cab.appendChild(el("span", { class: "empty" }, "결승에 간 대회가 없다"));
+  c2.appendChild(cab);
+  p.appendChild(c2);
+
+  /* ③ 경기력 */
+  const c3 = el("div");
+  c3.appendChild(el("h3", null, "경기력"));
+  if (t && t.stats) {
+    const x = t.stats, dl = el("dl", { class: "kv" });
+    dl.innerHTML = "<dt>평균 평점</dt><dd><b>" + x.avgRating + "</b></dd>" +
+      "<dt>기대득점 / 경기</dt><dd>" + x.xG + "</dd>" +
+      "<dt>슈팅 / 경기</dt><dd>" + x.shots + "</dd>" +
+      "<dt>유효 슈팅</dt><dd>" + x.onTargetPct + "%</dd>" +
+      "<dt>패스 성공</dt><dd>" + x.passPct + "%</dd>" +
+      "<dt>태클 성공</dt><dd>" + x.tacklePct + "%</dd>" +
+      "<dt>클린시트</dt><dd>" + (x.cleanSheets == null ? "—" : x.cleanSheets) + "</dd>" +
+      "<dt>기대실점 방어</dt><dd>" + (x.xGPrevented == null ? "—" : (x.xGPrevented > 0 ? "+" : "") + x.xGPrevented) + "</dd>";
+    c3.appendChild(dl);
+  } else c3.appendChild(el("div", { class: "miss" }, "이 시즌은 상세 기록이 없다"));
+  p.appendChild(c3);
+
+  /* ④ 그 해의 최고 기록 — 값은 정확하고 **이름은 모른다** */
+  const c4 = el("div");
+  c4.appendChild(el("h3", null, "그 해의 최고 기록"));
+  if (rc) {
+    const dl = el("dl", { class: "kv" });
+    dl.innerHTML = "<dt>최다 출장</dt><dd>" + rc.app + "</dd>" +
+      "<dt>최다 득점</dt><dd><b>" + rc.goal + "</b></dd>" +
+      "<dt>최다 도움</dt><dd>" + rc.assist + "</dd>" +
+      "<dt>최다 MVP</dt><dd>" + rc.motm + "</dd>" +
+      "<dt>최고 평점</dt><dd>" + (rc.rate || "—") + "</dd>" +
+      "<dt>등록 인원</dt><dd>" + rc.rows + "</dd>";
+    c4.appendChild(dl);
+    c4.appendChild(el("p", { class: "note", style: "margin-top:9px" },
+      "값은 정확한데 <b>누구인지는 모릅니다</b> — 이력 표에 사람 칸이 없습니다."));
+  } else c4.appendChild(el("div", { class: "miss" }, "이 시즌 기록이 없다"));
+  p.appendChild(c4);
+
+  /* ⑤ 그 해의 명단 (내보내기 — 이름이 있다) */
+  const c5 = el("div");
+  c5.appendChild(el("h3", null, "그 해의 얼굴들"));
+  if (ro) {
+    const ul = el("ul", { class: "plist" });
+    for (const q of ro.top) {
+      const li = el("li");
+      li.innerHTML = '<span class="nm">' + q.name +
+        (q.full && q.full !== q.name ? ' <span class="fl">' + q.full + "</span>" : "") + "</span>" +
+        '<span class="num">' + q.ca + "</span>";
+      ul.appendChild(li);
+    }
+    c5.appendChild(ul);
+    c5.appendChild(el("p", { class: "note", style: "margin-top:9px" },
+      "능력치 상위 다섯 · 그 해 등록 <b>" + ro.n + "명</b>"));
+  } else {
+    c5.appendChild(el("div", { class: "miss" }, "이 해는 명단이 없습니다"));
+    c5.appendChild(el("p", { class: "note", style: "margin-top:9px" },
+      "내보내기 파일이 없는 해입니다. <b>순위와 성적은 세이브에서 옵니다</b> — 그래서 빈칸이 아니라 반쪽입니다."));
+  }
+  p.appendChild(c5);
+}
+
+/* 처음 화면: 트로피가 가장 많은 해를 편다 */
+(function first() {
+  if (!D.runs || !D.runs.length) return;
+  let best = D.runs[0], n = -1;
+  for (const s of D.runs) {
+    const w = s.runs.filter((r) => r.result === "우승").length;
+    if (w > n) { n = w; best = s; }
+  }
+  pickSeason(best.season);
+})();
+
+/* ── ③ 시즌 경기력 ─────────────────────────────────────── */
+(function perf() {
+  const rows = D.timeline.filter((s) => s.stats || s.standing);
+  const rated = rows.filter((s) => s.stats);
+  const maxRate = Math.max.apply(null, rated.map((s) => s.stats.avgRating || 0));
+  const maxXg = Math.max.apply(null, rated.map((s) => s.stats.xG || 0));
+  const cols = ["시즌", "디비전", "순위", "경기", "승-무-패", "득실", "승점", "평균평점",
+    "xG (PK 제외)", "실점방어", "슛", "유효%", "패스%", "태클%", "클린시트"];
+  const t = $("perf");
+  const hr = el("tr");
+  cols.forEach((c, i) => hr.appendChild(el("th", { class: i < 2 ? "l" : "" }, c)));
+  t.appendChild(el("thead")).appendChild(hr);
+
+  const bar = (v, max, cls) => v == null ? MISS
+    : '<span class="bar ' + cls + '"><span class="num">' + v.toFixed(2) + "</span>" +
+      '<i style="width:' + Math.max(3, 46 * v / max) + 'px"></i></span>';
+
+  const tb = el("tbody");
+  for (const s of rows) {
+    const st = s.standing, x = s.stats, r = el("tr");
+    const xgp = x && x.xGPrevented != null
+      ? '<span class="num" style="color:' + (x.xGPrevented >= 0 ? "var(--good)" : "var(--crit)") + '">' +
+        (x.xGPrevented > 0 ? "+" : "") + x.xGPrevented.toFixed(1) + "</span>"
+      : MISS;
+    r.innerHTML =
+      '<td class="l num">' + s.season + "</td>" +
+      '<td class="l dim">' + s.divName + "</td>" +
+      "<td>" + (st ? '<span class="pos ' + (st.pos === 1 ? "gold" : st.pos <= 3 ? "top" : "plain") +
+        '">' + st.pos + "</span>" : '<span class="miss">진행 중</span>') + "</td>" +
+      "<td>" + (st ? N(st.played) : MISS) + "</td>" +
+      '<td class="num">' + (st ? st.w + "-" + st.d + "-" + st.l : MISS) + "</td>" +
+      '<td class="num">' + (st ? st.gf + ":" + st.ga : MISS) + "</td>" +
+      "<td>" + (st ? "<b>" + N(st.pts) + "</b>" : MISS) + "</td>" +
+      "<td>" + (x ? bar(x.avgRating, maxRate, "") : MISS) + "</td>" +
+      "<td>" + (x ? bar(x.xG, maxXg, "o") + ' <span class="dim num">(' + x.xGNoPen.toFixed(2) + ")</span>" : MISS) + "</td>" +
+      "<td>" + xgp + "</td>" +
+      "<td>" + (x ? N(x.shots, 1) : MISS) + "</td>" +
+      "<td>" + (x ? N(x.onTargetPct, 1) : MISS) + "</td>" +
+      "<td>" + (x ? N(x.passPct, 1) : MISS) + "</td>" +
+      "<td>" + (x ? N(x.tacklePct, 1) : MISS) + "</td>" +
+      "<td>" + (x ? N(x.cleanSheets) : MISS) + "</td>";
+    tb.appendChild(r);
+  }
+  t.appendChild(tb);
+})();
+
+/* ── ④ 선수단 ─────────────────────────────────────────── */
+(function squadTable() {
+  const q = D.squad.slice().sort((a, b) => (b.ca || 0) - (a.ca || 0));
+  const t = $("squad");
+  const cols = [["#", ""], ["이름", "l"], ["나이", ""], ["포지션", "l"], ["등급", "l"],
+    ["현재능력 / 잠재능력", "l"], ["주급", ""], ["계약 만료", ""], ["리그 통산", ""], ["전 대회 통산", ""]];
+  const hr = el("tr");
+  cols.forEach((c) => hr.appendChild(el("th", { class: c[1] }, c[0])));
+  t.appendChild(el("thead")).appendChild(hr);
+
+  const tb = el("tbody");
+  for (const p of q) {
+    const pa = paOf(p.pa), r = el("tr");
+    const gauge = '<span class="gauge"><b style="width:' + (100 * (p.ca || 0) / 200) + '%"></b>' +
+      (pa ? '<u style="left:calc(' + (100 * pa / 200) + '% - 1px)"></u>' : "") + "</span>";
+    r.innerHTML =
+      '<td class="num dim">' + (p.num || "") + "</td>" +
+      '<td class="l"><b>' + whoHtml(p) + "</b></td>" +
+      "<td>" + N(p.age) + "</td>" +
+      '<td class="l dim">' + (p.pos.map((k) => POS[k] || k).join(" ") || MISS) + "</td>" +
+      '<td class="l dim">' + (p.grade || MISS) + "</td>" +
+      '<td class="l">' + gauge + ' <span class="num">' + (p.ca || "—") + "</span>" +
+        '<span class="dim num"> / ' + (pa || "—") + "</span></td>" +
+      "<td>" + N(p.wage) + "</td>" +
+      '<td class="num dim">' + (p.to || "—") + "</td>" +
+      '<td class="num">' + (p.lgApp != null ? p.lgApp + " / " + p.lgGoal : MISS) + "</td>" +
+      '<td class="num">' + (p.acApp != null ? p.acApp + " / " + p.acGoal : MISS) + "</td>";
+    bindTip(r, "<b>" + who(p) + "</b>생일 " + (p.dob || "—") + " · 합류 " + (p.joined || "—") +
+      (pa ? "<br>잠재까지 " + (pa - p.ca) + " 남음" : "<br>잠재능력이 아직 안 정해진 선수"));
+    tb.appendChild(r);
+  }
+  t.appendChild(tb);
+})();
+
+/* ── ⑤ 명예의 전당 ─────────────────────────────────────── */
+(function hof() {
+  const has = D.squad.filter((p) => p.acApp != null);
+  const draw = (id, key, label, cls) => {
+    const t = $(id), q = has.slice().sort((a, b) => b[key] - a[key]).slice(0, 12);
+    const max = q.length ? q[0][key] : 1;
+    const hr = el("tr");
+    hr.appendChild(el("th", { class: "l", colspan: 3 },
+      label + ' <span style="text-transform:none;font-weight:400">— 커리어 통산 (이 구단 기록이 아님)</span>'));
+    t.appendChild(el("thead")).appendChild(hr);
+    const tb = el("tbody");
+    q.forEach((p, i) => {
+      const r = el("tr");
+      r.innerHTML = '<td class="l dim num" style="width:26px">' + (i + 1) + "</td>" +
+        '<td class="l"><b>' + whoHtml(p) + '</b> <span class="dim num">' + p.age + "</span></td>" +
+        '<td><span class="bar ' + cls + '"><span class="num">' + p[key].toLocaleString("ko-KR") +
+          '</span><i style="width:' + Math.max(3, 70 * p[key] / max) + 'px"></i></span></td>';
+      bindTip(r, "<b>" + who(p) + "</b>리그 " + p.lgApp + "경기 " + p.lgGoal + "골<br>전 대회 " +
+        p.acApp + "경기 " + p.acGoal + "골");
+      tb.appendChild(r);
+    });
+    t.appendChild(tb);
+  };
+  draw("hofApp", "acApp", "출장", "g");
+  draw("hofGoal", "acGoal", "득점", "o");
+})();
+
+/* ── ⑥ 성장 곡선 — 작은 그림 여럿 (계열색을 돌려쓰지 않으려고) ── */
+(function curves() {
+  const box = $("curves");
+  const top = D.curves.slice(0, 12);
+  $("pacount").textContent = D.curves.filter((c) => paOf(c.pa) != null).length;
+  const grid = el("div");
+  grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px";
+
+  for (const c of top) {
+    const W = 230, H = 108, L = 6, R = 6, T = 20, B = 18, lo = 90, hi = 205;
+    const svg = mk("svg", { viewBox: "0 0 " + W + " " + H, width: "100%", role: "img" });
+    svg.setAttribute("aria-label", c.name + " 현재능력 변화");
+    const xs = (i) => L + i * (W - L - R) / Math.max(1, c.pts.length - 1);
+    const ys = (v) => T + (hi - v) * (H - T - B) / (hi - lo);
+    const pa = paOf(c.pa);
+
+    if (pa) {
+      svg.appendChild(mk("line", { x1: L, x2: W - R, y1: ys(pa), y2: ys(pa),
+        stroke: "var(--s2)", "stroke-width": 1.5, "stroke-dasharray": "4 3" }));
+      const near = ys(pa) - 4 < 18;   /* 이름 줄(y=11)과 부딪히면 선 아래에 쓴다 */
+      const lb = mk("text", { x: W - R, y: ys(pa) + (near ? 10 : -4), "text-anchor": "end",
+        "font-size": 9, fill: "var(--s2)" });
+      lb.textContent = "잠재 " + pa; svg.appendChild(lb);
+    }
+    svg.appendChild(mk("polyline", { points: c.pts.map((p, i) => xs(i) + "," + ys(p.ca)).join(" "),
+      fill: "none", stroke: "var(--s1)", "stroke-width": 2, "stroke-linejoin": "round" }));
+    c.pts.forEach((p, i) => svg.appendChild(mk("circle",
+      { cx: xs(i), cy: ys(p.ca), r: 2.6, fill: "var(--s1)" })));
+
+    const nm = mk("text", { x: L, y: 11, "font-size": 10.5, fill: "var(--ink)", "font-weight": 600 });
+    nm.textContent = c.name; svg.appendChild(nm);
+    const gn = mk("text", { x: W - R, y: 11, "text-anchor": "end", "font-size": 10, fill: "var(--s3)" });
+    gn.textContent = "+" + c.gain; svg.appendChild(gn);
+    const a = mk("text", { x: L, y: H - 5, "font-size": 9 });
+    a.textContent = c.pts[0].season.slice(2); svg.appendChild(a);
+    const b = mk("text", { x: W - R, y: H - 5, "text-anchor": "end", "font-size": 9 });
+    b.textContent = c.pts[c.pts.length - 1].season.slice(2); svg.appendChild(b);
+
+    const cell = el("div"); cell.appendChild(svg);
+    bindTip(cell, "<b>" + c.name + "</b>" +
+      c.pts.map((p) => p.season + "  " + p.ca).join("<br>") + (pa ? "<br>잠재 " + pa : ""));
+    grid.appendChild(cell);
+  }
+  box.appendChild(grid);
+})();
+
+/* ── 출처 표 ──────────────────────────────────────────── */
+(function prov() {
+  const rows = [
+    ["구단 연표 · 순위 · 승점", "세이브", done.length + " / " + D.timeline.length + " 시즌", "tc_league_history_dt"],
+    ["시즌 경기력 · 평점 · xG", "세이브", D.timeline.filter((s) => s.stats).length + " / " + D.timeline.length + " 시즌", "player_stats_hist_dt"],
+    ["컵 성적", "세이브", D.timeline.filter((s) => s.cups.rounds).length + " 시즌", "tc_cup_history_dt"],
+    ["선수단 · CA · PA · 계약", "세이브", D.squad.length + " 명", "능력치 블록 +79 · +80"],
+    ["커리어 통산 출장 · 골", "세이브", D.squad.filter((p) => p.acApp != null).length + " / " + D.squad.length + " 명", "통산 15칸"],
+    ["성장 곡선", "내보내기", D.curves.length + " 명 (3시즌 이상)", ".fmf 12시즌"],
+    ["성장 곡선의 잠재 천장", "세이브", D.curves.filter((c) => paOf(c.pa) != null).length + " 명", "성 + 합류일로 연결"]
+  ];
+  const t = $("prov");
+  const hr = el("tr");
+  ["무엇", "어디서", "얼마나 채워졌나", "해독한 구획"].forEach((c, i) =>
+    hr.appendChild(el("th", { class: i === 2 ? "" : "l" }, c)));
+  t.appendChild(el("thead")).appendChild(hr);
+  const tb = el("tbody");
+  for (const row of rows) {
+    const r = el("tr");
+    r.innerHTML = '<td class="l">' + row[0] + "</td>" +
+      '<td class="l"><span class="src ' + (row[1] === "세이브" ? "sv" : "ex") + '">' + row[1] + "</span></td>" +
+      '<td class="num">' + row[2] + "</td>" +
+      '<td class="l dim num" style="font-size:11.5px">' + row[3] + "</td>";
+    tb.appendChild(r);
+  }
+  t.appendChild(tb);
+})();
+
+/* ── 테마 단추 ────────────────────────────────────────── */
+$("themebtn").addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const dark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  const next = dark ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  try { localStorage.setItem("fmtheme", next); } catch (e) {}
+});
+try {
+  const s = localStorage.getItem("fmtheme");
+  if (s) document.documentElement.setAttribute("data-theme", s);
+} catch (e) {}
+
+/* ── 화면 셋 전환 (SPA) ────────────────────────────────
+ * 모든 화면을 **미리 다 그려 두고** 보이기만 바꾼다 — 표·그래프가 다시 그려지며 튀지 않는다.
+ * 주소의 #해시로 기억해서 새로고침해도 보던 화면이 남는다. */
+/* ── 올해의 팀 (NOTES 95) ── */
+(function bestxi() {
+  const sel = $('xipick'), box = $('xibox'), head = $('xihead');
+  if (!sel || !D.bestxi || !D.bestxi.length) return;
+  const L = D.bestxi.filter((r) => r.slots.some((x) => x && x.mine));
+  if (!L.length) return;
+  L.forEach((r, i) => sel.appendChild(el('option', { value: i }, r.season + ' · ' + r.div)));
+  function draw(i) {
+    const r = L[i]; box.textContent = '';
+    const n = r.slots.filter((x) => x && x.mine).length;
+    /* 리그가 아닌 줄(대회 116 · 635 …)은 우리 구단 줄인지 확실치 않다 — 우리 선수가 든 다른 팀(국가대표 등)일 수 있다 */
+    const league = !/^대회 /.test(r.div);
+    head.textContent = r.div + (league ? ' 시즌 XI — ' + CN + ' ' + n + '명' : ' XI — ' + CN + ' 선수 ' + n + '명 (우리 구단 줄인지 확실치 않음)');
+    const grp = (from, to, title) => {
+      box.appendChild(el('div', { class: 'xi-sub' }, title));
+      const g = el('div', { class: 'xi-grid' });
+      for (let k = from; k < to; k++) { const x = r.slots[k]; if (!x) continue;
+        const c = el('div', { class: 'xi-card' + (x.mine ? ' mine' : '') + (k >= 11 ? ' bench' : '') });
+        c.appendChild(el('div', { class: 'xi-n' }, k + 1));
+        c.appendChild(el('div', { class: 'xi-name' + (x.name ? '' : ' unk') }, x.name || ('이름 모름 · UID2 ' + x.who)));
+        const st = el('div', { class: 'xi-st' });
+        st.innerHTML = '<b>' + x.apps + '</b>경기 <b>' + x.goals + '</b>골<br>평점 ' + (x.rating == null ? '-' : x.rating.toFixed(2));
+        c.appendChild(st); g.appendChild(c); }
+      box.appendChild(g); };
+    grp(0, 11, '선발 XI'); grp(11, 18, '후보');
+  }
+  sel.addEventListener('change', function () { draw(+sel.value); });
+  /* 처음엔 가장 최근 **리그** XI 를 보인다 */
+  let i0 = L.length - 1; for (let i = L.length - 1; i >= 0; i--) if (!/^대회 /.test(L[i].div)) { i0 = i; break; }
+  sel.value = i0; draw(i0);
+})();
+(function router() {
+  const nav = $('nav'); if (!nav) return;
+  const views = { mgr: $('v-mgr'), club: $('v-club'), player: $('v-player') };
+  function go(v, push) {
+    if (!views[v]) v = 'mgr';
+    for (const k in views) if (views[k]) views[k].hidden = (k !== v);
+    for (const btn of nav.children) btn.setAttribute('aria-selected', String(btn.dataset.v === v));
+    if (push && location.hash !== '#' + v) history.replaceState(null, '', '#' + v);
+    /* 화면을 켤 때 고른 카드가 안 보이면 밀어 준다 — 숨어 있는 동안엔 스크롤이 안 먹는다 */
+    const on = views[v] && views[v].querySelector('.ss-card.on, .pd-card');
+    if (on) on.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+  for (const btn of nav.children)
+    btn.addEventListener('click', function () { go(btn.dataset.v, true); });
+  addEventListener('hashchange', function () { go(location.hash.slice(1), false); });
+  go(location.hash.slice(1) || 'mgr', false);
+})();
+<\/script>`;
+
+function html(payload) {
+  const json = typeof payload === "string" ? payload : JSON.stringify(payload);
+  const safe = json.split("</").join("<\\/");
+  return HEAD + "\n" +
+    "<script type=\"application/json\" id=\"payload\">" + safe + "</" + "script>\n" +
+    BODY + "\n" + SCRIPT + "\n";
+}
+
+if (require.main === module) {
+  const fs = require("fs");
+  const path = require("path");
+  const argv = process.argv.slice(2);
+  let src = null, out = null;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--out") out = argv[++i];
+    else if (!src) src = argv[i];
+  }
+  if (!src) { console.log("쓰기: node spa.js <payload.json> [--out career.html]"); process.exit(1); }
+  const json = fs.readFileSync(src, "utf8");
+  const doc = html(json);
+  const dest = out || path.join(__dirname, "career.html");
+  fs.writeFileSync(dest, doc);
+  const D = JSON.parse(json);
+  console.log("구단      " + ((D.club && (D.club.name || D.club.id)) || "?"));
+  console.log("자료      " + (json.length / 1024).toFixed(0) + "KB");
+  console.log("출력      " + dest + "  (" + (doc.length / 1024).toFixed(0) + "KB)");
+}
+
+module.exports = { html };
+
+});</script>
 <script>
 (function (root) {
   "use strict";
@@ -2177,6 +3769,8 @@ module.exports = { buildPayload, html };
     basename: (p) => norm(p).split("/").pop(),
     dirname: (p) => norm(p).split("/").slice(0, -1).join("/") || ".",
     extname: (p) => { const b = norm(p).split("/").pop(); const i = b.lastIndexOf("."); return i > 0 ? b.slice(i) : ""; },
+
+    isAbsolute: (p) => /^([A-Za-z]:)?[\\/]/.test(String(p)),
   };
 
   let Bytes = null;
@@ -2197,8 +3791,13 @@ module.exports = { buildPayload, html };
   };
 
   const enoent = (p) => { const e = new Error("ENOENT: no such file or directory, open '" + p + "'"); e.code = "ENOENT"; throw e; };
+
+  const isDir = (p) => { const d = norm(p).replace(/\/$/, "") + "/";
+    for (const k of FILES.keys()) if (k.startsWith(d)) return true;
+    return false; };
   const fsMod = {
-    existsSync: (p) => FILES.has(norm(p)),
+
+    existsSync: (p) => FILES.has(norm(p)) || isDir(p),
     readFileSync: function (p, enc) {
       const v = FILES.get(norm(p));
       if (v === undefined) enoent(p);
@@ -2284,6 +3883,7 @@ module.exports = { buildPayload, html };
     fs: fsMod, path: pathMod, Buffer: BufferShim };
 })(typeof window !== "undefined" ? window : globalThis);
 </script>
+<script>window.__AWARDS_SRC = "\n\"use strict\";\nconst fs = require(\"fs\");\n\nconst path = require(\"path\");\nconst GDB = process.argv[2], AWD = process.argv[3], CLUB = process.argv[4] ? Number(process.argv[4]) : null;\nconst DIR = process.argv[5] || path.join(__dirname, \"..\");\n\nlet NAMES = new Map();\n\nlet MY_CLUB = null;\ntry { const d = JSON.parse(fs.readFileSync(path.join(DIR, \"data.json\"), \"utf8\"));\n  const c = (d.clubs || []).find((x) => x.meta && x.meta.clubId === CLUB);\n  MY_CLUB = c ? c.name : null; } catch (e) {}\nif (CLUB && !MY_CLUB) console.log(\"⚠ 구단 UID \" + CLUB + \" 에 맞는 아카이브 구단을 못 찾았다 — 이름을 안 붙인다\");\ntry { if (MY_CLUB) NAMES = require(\"./names.js\").build(DIR, { log: console.log, club: MY_CLUB }); }\ncatch (e) { console.log(\"이름 다리 없음 (\" + e.message + \") — 사람ID 로 보인다\"); }\nconst nameOf = (p) => {\n  if (!p) return null;\n  const n = p.id != null ? NAMES.get(p.id) : null;\n\n  return (n && (n.localName || n.fullName || n.name)) || LOCAL.get(p.loc) || p.full ||\n         DICT.get(p.sur) || (p.id != null ? \"사람\" + p.id : null);\n};\nif (!GDB || !AWD) { console.log(\"쓰기: node save/awards.js <game_db.dat> <award_year_hist_dt.cmt> [구단UID]\"); process.exit(1); }\n\nconst g = fs.readFileSync(GDB);\n\nlet DICT = new Map();\ntry { DICT = require(\"./names.js\").dictionary(g); } catch (e) {}\n\nlet LOCAL = new Map();\ntry { LOCAL = require(\"./names.js\").localNames(g); } catch (e) {}\nconsole.log(\"이름 사전 \" + DICT.size + \"항목\");\nconst SIG = Buffer.from(\"01006c0701006c07\", \"hex\");\nconst dayStr = (d, y) => (y < 1850 || y > 2200 || d < 1 || d > 366) ? null :\n  (() => { const t = new Date(Date.UTC(y, 0, 1)); t.setUTCDate(d); return t.toISOString().slice(0, 10); })();\n\nconst IN_GAME_FROM = 2023;\nconst all = new Map();\nlet people = 0, framed = 0;\n\n{ for (let q = 0; q + 9 <= g.length; q++) {\n    if (!(g[q] === 0x01 && g[q + 1] === 0x00 && g[q + 2] === 0x6c && g[q + 3] === 0x07 && g[q + 4] === 0x00)) continue;\n    const u2 = g.readUInt32LE(q + 5); if (!u2 || u2 === 0xffffffff || u2 > 2000000) continue;\n    const at = g.indexOf(SIG, q); if (at < 0 || at - q > 1200) continue;\n    const raw = g.readUInt32LE(at + 8);\n    const id = (raw >= 1 && raw <= 400000) ? raw : null;\n    const len = g.readUInt32LE(at + 44); if (len > 120) continue;\n    const born = g.readUInt16LE(at + 48 + len + 2);\n\n    if (born < 1850 || born > 2200) continue;\n    const dob = dayStr(g.readUInt16LE(at + 48 + len) & 0x1ff, born);\n    let full = \"\";\n    if (len) { full = g.slice(at + 48, at + 48 + len).toString(\"utf8\");\n               if (/[\\x00-\\x1f]/.test(full)) continue; }\n    people++; framed++;\n    if (!all.has(u2)) all.set(u2, []);\n\n    all.get(u2).push({ id, dob, born, full, sur: g.readUInt32LE(at + 34), loc: g.readUInt32LE(at + 39), team: g.readUInt32LE(q + 9) });\n  } }\n\nconst byUid2 = new Map();\nfor (const [u, v] of all) { if (v.length === 1) byUid2.set(u, v[0]);\n\n  else if (v[0].id != null && v.every((p) => p.id === v[0].id)) byUid2.set(u, v.find((p) => p.full) || v[0]); }\nconsole.log(\"사람 \" + people + \" · UID2 틀 \" + framed + \" · UID2 값 \" + all.size +\n  \" · 사람 하나만 붙은 값 \" + byUid2.size + \" (\" + (100 * byUid2.size / all.size).toFixed(1) + \"%)\");\n\nconst b = fs.readFileSync(AWD), SZ = 82, H = 8;\nconst N = Math.floor((b.length - H) / SZ);\nconst SLOT = 26, BASE = 4;\nconst rows = [], podium = [];\nfor (let i = 0; i < N; i++) {\n  const o = H + i * SZ;\n  const y = b.readUInt16LE(o);\n  if (y < 1889 || y > 2100) continue;\n  const award = b.readUInt16LE(o + 2);\n  const place = [];\n  for (let sN = 0; sN < 3; sN++) {\n    const p = o + BASE + SLOT * sN;\n    const u = b.readUInt32LE(p);\n\n    place.push((u === 0 || u === 0xffffffff) ? null\n      : { who: u, club: b.readUInt32LE(p + 4), age: b[p + 8],\n            apps: b.readUInt16LE(p + 11), goals: b.readUInt16LE(p + 13), assists: b.readUInt16LE(p + 15),\n          rating: b.readUInt16LE(p + 11) ? +(b.readUInt16LE(p + 9) / b.readUInt16LE(p + 11) / 10).toFixed(2) : null });\n  }\n  podium.push({ y, award, place });\n  if (place[0]) rows.push({ y, award, who: place[0].who, club: place[0].club, age: place[0].age });\n}\nconsole.log(\"수상 레코드 \" + rows.length + \" / \" + N);\n\nlet ok = 0, bad = 0, miss = 0;\nfor (const r of rows) {\n  if (r.y < IN_GAME_FROM) continue;\n  if (r.age < 14 || r.age > 60) continue;\n  const p = byUid2.get(r.who);\n  if (!p) { miss++; continue; }\n  Math.abs((r.y - r.age) - p.born) <= 1 ? ok++ : bad++;\n}\nconst tot = ok + bad;\nconsole.log(\"검산(\" + IN_GAME_FROM + \"년 이후): 나이↔생년 맞음 \" + ok + \" · 어긋남 \" + bad +\n  \"  (\" + (tot ? (100 * ok / tot).toFixed(1) : \"-\") + \"%) · 사람 못 찾음 \" + miss);\nif (tot && ok / tot < 0.95) { console.log(\"★ 95% 미만이다 — 이 세이브에서는 UID2 다리가 안 통한다. 결과를 안 낸다.\"); process.exit(1); }\n\nconst AWARD_NAME = {\n\n  0: \"세계 골든 볼\",\n  97: \"프리미어 리그 올해의 감독\", 99: \"챔피언십 올해의 감독\",\n  101: \"리그 1 올해의 감독\", 103: \"리그 2 올해의 감독\",\n\n  7: \"잉글랜드 선수들이 뽑은 올해의 유망주\", 76: \"스페인 올해의 선수\",\n  42: \"프랑스 리그 1 올해의 외국인 선수\", 44: \"프랑스 리그 1 최우수 선수\",\n  138: \"월드컵 골든 부츠\",             374: \"월드컵 최우수 선수\",\n  369: \"잉글랜드 프리미어 리그 득점왕\",   370: \"잉글랜드 챔피언쉽 득점왕\",\n  371: \"잉글랜드 리그 1 득점왕\",        372: \"잉글랜드 리그 2 득점왕\",\n  383: \"유럽 챔피언스 리그 골든 부츠\",    405: \"유럽 골든 슈\",\n  415: \"잉글랜드 프리미어 리그 골든 글로브\",\n  682: \"아시아 올해의 유망주\",          686: \"아시안 컵 최우수 선수\",\n  687: \"아시안 컵 골든 부츠\",          1151: \"프랑스 리그 1 득점왕\",\n  1546: \"세계 클럽 선수권 대회 최우수 선수\", 2013: \"아시안 컵 골든 글러브\",\n  2190: \"잉글랜드 챔피언쉽 시즌 최우수 선수\", 2191: \"잉글랜드 리그 1 시즌 최우수 선수\",\n  2192: \"잉글랜드 리그 2 시즌 최우수 선수\",  2193: \"잉글랜드 챔피언쉽 올해의 유망주\",\n  2197: \"유럽 골든 보이\",             2198: \"유럽 선수권 대회 유망주\",\n  2472: \"이탈리아 세리에 A 올해의 미드필더\", 3153: \"NXGN\",\n  3183: \"세계 골든 글러브\",           3354: \"유럽 챔피언스 리그 올해의 선수\",\n  3355: \"유럽 챔피언스 리그 올해의 유망주\", 3385: \"잉글랜드 U21 프리미어 디비전 올해의 선수\",\n  4121: \"잉글랜드 U18 컵 올해의 재능\",\n\n  1: \"세계 올해의 축구 선수\",\n  2: \"세계 올해의 선수\",\n  6: \"잉글랜드 선수들이 뽑은 올해의 선수\",\n  141: \"잉글랜드 올해의 선수\",\n  3152: \"GOAL50\",\n  2195: \"유럽 최우수 선수\",\n  4235: \"Player of the Season\",\n  4292: \"Player of the Season\",\n  2987: \"세계 U21 올해의 축구 선수\",\n  4132: \"The Athletic Rookie of the Year\",\n  375: \"월드컵 최우수 골키퍼\",\n  2189: \"월드컵 최우수 유망주\",\n  5: \"아프리카 올해의 선수\",\n\n  4106: \"U19 Voetbal Talent van het Jaar\", 4192: \"U20 Voetbal Talent van het Jaar\",\n  4193: \"U21 Voetbal Talent van het Jaar\",\n  53: \"네덜란드 올해의 유망주\",\n  56: \"네덜란드 에레디비시 골든 부츠\",\n  1461: \"유럽 인터내셔널 리그 최우수 선수\",\n  4196: \"TOTO KNVB BEKER Top Talent\",\n  4127: \"잉글랜드 U21 컵 올해의 재능\",\n};\n\nconst MGR_AWARDS = new Set([97, 99, 101, 103]);\nlet ARCHIVE_MGR = null;\ntry { const d = JSON.parse(fs.readFileSync(path.join(DIR, \"data.json\"), \"utf8\"));\n  const m0 = d.managers && d.managers[0];\n  ARCHIVE_MGR = (typeof m0 === \"string\" ? m0 : (m0 && m0.name)) || null; } catch (e) {}\n\nif (CLUB) {\n  const mine = rows.filter((r) => r.club === CLUB && r.y >= IN_GAME_FROM);\n  const byWho = new Map();\n  for (const r of mine) { if (!byWho.has(r.who)) byWho.set(r.who, []); byWho.get(r.who).push(r); }\n  console.log(\"\\n■ 구단 \" + CLUB + \" 수상자 \" + byWho.size + \"명 · 레코드 \" + mine.length);\n  const list = [...byWho].sort((a, c) => c[1].length - a[1].length);\n  for (const [who, rs] of list) {\n    const p = byUid2.get(who);\n    const onlyMgr = rs.every((r) => MGR_AWARDS.has(r.award));\n    const nm = nameOf(p) ||\n      (onlyMgr ? ((ARCHIVE_MGR ? ARCHIVE_MGR : \"이름 모름\") + \" (감독)\") : (\"UID2 \" + who + \" (사람 표에 없음)\"));\n    const yrs = [...new Set(rs.map((r) => r.y))].sort();\n    console.log(\"  \" + nm.padEnd(26) + String(rs.length).padStart(3) + \"회 · \" +\n      yrs[0] + \"~\" + yrs[yrs.length - 1] + \" · 상 \" + new Set(rs.map((r) => r.award)).size + \"종\" +\n      (() => { const n = [...new Set(rs.map((r) => r.award))].filter((a) => AWARD_NAME[a]);\n        return n.length ? \"  [\" + n.map((a) => AWARD_NAME[a]).join(\" · \") + \"]\" : \"\"; })());\n  }\n\n  const golden = rows.filter((r) => r.award === 0 && r.y >= IN_GAME_FROM).sort((a, c) => a.y - c.y);\n  console.log(\"\\n■ 세계 골든 볼 (상 0) — 표의 연도는 **시즌 끝해**다\");\n  for (const r of golden) {\n    const p = byUid2.get(r.who);\n    console.log(\"  \" + (r.y - 1) + \"-\" + String(r.y % 100).padStart(2, \"0\") + \"  \" +\n      (nameOf(p) || (\"UID2 \" + r.who)).padEnd(26) + \" \" + r.age + \"세 · 구단 \" + r.club);\n  }\n}\n\nif (CLUB) {\n  const AW = Number(process.env.PODIUM || 0);\n  console.log(\"\\n■ 포디움 — \" + (AWARD_NAME[AW] || (\"상 \" + AW)));\n  const mark = [\"1위\", \"2위\", \"3위\"];\n  for (const p of podium.filter((x) => x.award === AW && x.y >= IN_GAME_FROM).sort((a, c) => a.y - c.y)) {\n    const line = p.place.map((q, i) => {\n      if (!q) return mark[i] + \" —\";\n      return mark[i] + \" \" + (nameOf(byUid2.get(q.who)) || (\"UID2 \" + q.who)) + \" \" + q.age + \"세\" +\n        (q.apps ? \" (\" + q.apps + \"경기 \" + q.goals + \"골 \" + q.assists + \"도움 \" + q.rating + \")\" : \"\");\n    }).join(\"   \");\n    console.log(\"  \" + (p.y - 1) + \"-\" + String(p.y % 100).padStart(2, \"0\") + \"  \" + line);\n  }\n}\n";</script>
 <script>NodeRun.define("standing.js", function (module, exports, require, process, console, Buffer) {
 
 const fs = require("fs"), path = require("path");
@@ -2671,6 +4271,7 @@ else console.log(JSON.stringify(out.seasons.slice(-3), null, 1));
 
 const fs = require("fs");
 
+const CLI_QUIET = false;
 const F = process.argv[2];
 if (!F) { console.log("쓰기: node save/manager.js <person_record_manager.dat>"); process.exit(1); }
 const b = fs.readFileSync(F);
@@ -2740,11 +4341,38 @@ for (const r of rows) cnt.set(r.team, (cnt.get(r.team) || 0) + 1);
 console.log("\n팀별 레코드 수: " + [...cnt].sort((a, c) => c[1] - a[1]).map((x) => x[0] + "×" + x[1]).join(" "));
 console.log("★ 여기 나온 번호가 `player_stats_hist_dt` 의 `+1` 구단 칸이 쓰는 번호다 (4-26 ⑫).");
 
+const spells = [];
+{
+  const frag = [];
+  for (const r of rows) {
+    const last = frag[frag.length - 1];
+    if (!last || last.team !== r.team) frag.push({ team: r.team, from: r.date, to: r.date });
+    else last.to = r.date;
+  }
+  const END = rows[rows.length - 1].date;
+  for (let i = 0; i < frag.length; i++) frag[i].until = i + 1 < frag.length ? frag[i + 1].from : null;
+  for (const f of frag) {
+    const last = spells[spells.length - 1];
+    if (last && last.team === f.team) { last.until = f.until; continue; }
+    const days = (Date.parse(f.until || END) - Date.parse(f.from)) / 864e5;
+    if (days < 200 && last) { (last.flicker = last.flicker || []).push(f.team + "@" + f.from); continue; }
+    spells.push({ team: f.team, from: f.from, until: f.until });
+  }
+  for (let k = 0; k + 1 < spells.length; k++) spells[k].until = spells[k + 1].from;
+}
+if (!CLI_QUIET) {
+  console.log("\n재임 " + spells.length + "개 (사건을 묶은 것 — 200일 미만 조각은 앞에 합쳤다)");
+  for (const s of spells)
+    console.log("  " + s.from + " ~ " + (s.until || "(지금)") + "  팀 " + String(s.team).padStart(6) +
+      (s.flicker ? "   ⚠ 합친 조각 " + s.flicker.join(",") : ""));
+}
+
 module.exports = {
   rows: rows,
   person: [...ids][0],
   teams: [...cnt].sort((a, c) => c[1] - a[1]).map(([team, n]) => ({ team: team, n: n })),
   byYear: [...byYear].map(([y, m]) => ({ year: Number(y), main: [...m].sort((a, c) => c[1] - a[1])[0][0] })),
+  spells: spells,
 };
 
 });</script>
@@ -2799,6 +4427,938 @@ for (const s of ids.sort((a, c) => (label.get(a) || "").localeCompare(label.get(
   console.log("  " + String(s).padStart(5) + "  " + String(F.get(s).years.size).padStart(2) + "해  " + (label.get(s) || "?").padEnd(16) + (NAMES[s] ? NAMES[s].padEnd(22) : "".padEnd(22)) + (note.get(s) || ""));
 
 });</script>
+<script>NodeRun.define("names.js", function (module, exports, require, process, console, Buffer) {
+
+"use strict";
+const fs = require("fs");
+const path = require("path");
+
+function endsWithSur(full, sur) {
+  const a = (full || "").trim(), b = (sur || "").trim();
+  return !!b && (a === b || a.endsWith(" " + b));
+}
+
+const KEYS = [
+  ["키+몸무게+합류일",  (p) => [p.height, p.weight, p.joined].join("|")],
+  ["합류일+계약끝",     (p) => [p.joined, p.contractTo].join("|")],
+  ["키+몸무게+계약끝",   (p) => [p.height, p.weight, p.contractTo].join("|")],
+  ["키+몸무게+등번호",   (p) => [p.height, p.weight, p.number].join("|")],
+  ["합류일+키",        (p) => [p.joined, p.height].join("|")],
+];
+
+function build(dir, opts) {
+  dir = dir || ".";
+  const log = (opts && opts.log) || (() => {});
+
+  const only = opts && opts.club ? String(opts.club) : null;
+  const data = JSON.parse(fs.readFileSync(path.join(dir, "data.json"), "utf8"));
+  const sqDir = path.join(dir, "save-squads");
+  if (!fs.existsSync(sqDir)) return new Map();
+
+  const out = new Map();
+  let tot = 0, hit = 0, ok = 0, rejected = 0;
+
+  for (const f of fs.readdirSync(sqDir)) {
+    if (!f.endsWith(".json")) continue;
+    const s = JSON.parse(fs.readFileSync(path.join(sqDir, f), "utf8"));
+    if (only && s.archiveClub !== only) continue;
+    const club = (data.clubs || []).find((x) => x.name === s.archiveClub);
+    const ex = club && (club.seasons || []).find((z) => z.season === s.season);
+    if (!ex || !Array.isArray(ex.players)) continue;
+
+    const idx = KEYS.map(([, k]) => {
+      const m = new Map();
+      for (const p of ex.players) { const q = k(p); if (!m.has(q)) m.set(q, []); m.get(q).push(p); }
+      return m;
+    });
+
+    for (const p of s.squad) {
+      if (p.person == null) continue;
+      tot++;
+      let got = null, via = null;
+      for (let i = 0; i < KEYS.length; i++) {
+        const v = idx[i].get(KEYS[i][1](p));
+        if (v && v.length === 1) { got = v[0]; via = KEYS[i][0]; break; }
+      }
+      if (!got) continue;
+
+      if (p.name && got.name && !endsWithSur(got.name, p.name)) { rejected++; continue; }
+      if (p.name && got.name) ok++;
+      hit++;
+
+      if (!out.has(p.person))
+        out.set(p.person, { name: got.name || null, localName: got.localName || null,
+          fullName: got.fullName || null, club: s.archiveClub, season: s.season, via });
+    }
+  }
+  log("이름 다리" + (only ? "(" + only + ")" : "(모든 커리어 — 세이브와 잇지 말 것)") +
+      ": 세이브 선수 " + tot + " 중 " + hit + " 명 붙음 (" +
+      (tot ? (100 * hit / tot).toFixed(1) : "-") + "%) · 성 검산 통과 " + ok + " · 성 어긋나 버림 " + rejected);
+  return out;
+}
+
+function dictionary(buf, anchorWord) {
+  const w = Buffer.from(anchorWord || "Garnacho", "utf8");
+  const at = buf.indexOf(w);
+  if (at < 8) return new Map();
+  return dictFrom(buf, at - 8);
+}
+
+function dictFrom(buf, head0) {
+  const ok = (p) => {
+    if (p < 0 || p + 8 > buf.length) return false;
+    const len = buf.readUInt32LE(p + 4);
+    if (len < 1 || len > 80 || p + 8 + len > buf.length) return false;
+    for (let i = p + 8; i < p + 8 + len; i++) if (buf[i] < 0x20) return false;
+    return true;
+  };
+  if (!ok(head0)) return new Map();
+
+  let head = head0;
+  for (;;) {
+    const want = buf.readUInt32LE(head) - 1;
+    if (want < 0) break;
+    let found = -1;
+    for (let p = head - 9; p >= Math.max(0, head - 200); p--)
+      if (buf.readUInt32LE(p) === want && ok(p) && p + 8 + buf.readUInt32LE(p + 4) === head) { found = p; break; }
+    if (found < 0) break;
+    head = found;
+  }
+  const m = new Map();
+  let p = head, prev = buf.readUInt32LE(head) - 1;
+  while (p + 8 <= buf.length) {
+    const id = buf.readUInt32LE(p), len = buf.readUInt32LE(p + 4);
+    if (id !== prev + 1 || !ok(p)) break;
+    m.set(id, buf.slice(p + 8, p + 8 + len).toString("utf8"));
+    prev = id; p += 8 + len;
+  }
+  return m;
+}
+
+function localNames(buf) {
+  const SIG = Buffer.from("01006c0701006c07", "hex");
+
+  const samp = [];
+  for (let q = 0; q + 9 <= buf.length && samp.length < 60; q++) {
+    if (!(buf[q] === 0x01 && buf[q + 1] === 0x00 && buf[q + 2] === 0x6c && buf[q + 3] === 0x07 && buf[q + 4] === 0x00)) continue;
+    const u2 = buf.readUInt32LE(q + 5);
+    if (!u2 || u2 === 0xffffffff || u2 > 2000000) continue;
+    const at = buf.indexOf(SIG, q);
+    if (at < 0 || at - q > 1200) continue;
+    const len = buf.readUInt32LE(at + 44);
+    if (!len || len > 120) continue;
+    const born = buf.readUInt16LE(at + 48 + len + 2);
+    if (born < 1850 || born > 2200) continue;
+    const full = buf.slice(at + 48, at + 48 + len).toString("utf8");
+    if (/[\x00-\x1f]/.test(full)) continue;
+    const id = buf.readUInt32LE(at + 39);
+    if (!id || id > 4000000) continue;
+    samp.push({ id, words: new Set(full.split(/\s+/)) });
+  }
+  if (!samp.length) return new Map();
+
+  const cand = [], seen = new Set();
+  for (const s of samp.slice(0, 6)) {
+    const key = Buffer.alloc(4); key.writeUInt32LE(s.id);
+    let p = -1;
+    while ((p = buf.indexOf(key, p + 1)) >= 0 && cand.length < 8) {
+      const n = p + 8 <= buf.length ? buf.readUInt32LE(p + 4) : 0;
+      if (n < 1 || n > 80 || p + 8 + n > buf.length) continue;
+      let bad = false;
+      for (let i = p + 8; i < p + 8 + n; i++) if (buf[i] < 0x20) { bad = true; break; }
+      if (bad) continue;
+      const word = buf.slice(p + 8, p + 8 + n).toString("utf8");
+      if (Buffer.byteLength(word, "utf8") !== n) continue;
+      const m = dictFrom(buf, p);
+      if (m.get(s.id) !== word || m.size < 1000) continue;
+      const mark = m.size + ":" + (m.get(0) || "");
+      if (seen.has(mark)) continue;
+      seen.add(mark);
+      cand.push(m);
+    }
+  }
+  if (!cand.length) return new Map();
+
+  let best = null, bestRate = -1;
+  for (const m of cand) {
+    let hit = 0, tot = 0;
+    for (const s of samp) { const v = m.get(s.id); if (v == null) continue; tot++; if (/\s/.test(v)) hit++; }
+    if (tot < 5) continue;
+    const rate = hit / tot;
+    if (rate > bestRate) { bestRate = rate; best = m; }
+  }
+  return bestRate >= 0.3 ? best : new Map();
+}
+
+module.exports = { build, endsWithSur, KEYS, dictionary, localNames };
+
+if (require.main === module) {
+  const dir = process.argv[2] || ".";
+  const m = build(dir, { log: console.log, club: process.argv[3] || null });
+  const withKo = [...m.values()].filter((v) => v.localName).length;
+  console.log("한글 이름이 있는 사람 " + withKo + " / " + m.size);
+  let n = 0;
+  for (const [id, v] of m) { if (!v.localName) continue;
+    console.log("  " + String(id).padStart(7) + "  " + v.localName.padEnd(12) + " " + (v.name || ""));
+    if (++n >= 15) break; }
+}
+
+});</script>
+<script>NodeRun.define("clubmap.js", function (module, exports, require, process, console, Buffer) {
+
+"use strict";
+const fs = require("fs");
+const path = require("path");
+
+function buildMapper(D, NOW) {
+const GDB = path.join(D, "game_db.dat"), CLB = path.join(D, "clubs.json");
+if (!fs.existsSync(GDB) || !fs.existsSync(CLB)) throw new Error("game_db.dat 과 clubs.json 이 있어야 한다: " + D);
+
+const b = fs.readFileSync(GDB);
+const clubs = new Map(JSON.parse(fs.readFileSync(CLB, "utf8")));
+const SIG = Buffer.from("01006c0701006c07", "hex");
+const MARK = Buffer.from("01006c0701006c0700000000", "hex");
+
+const WIN = 20;
+const MAXAGE = 25;
+const MIN = 10;
+
+const per = [];
+{ let at = -1;
+  while ((at = b.indexOf(SIG, at + 1)) >= 0) {
+    const len = b.readUInt32LE(at + 44); if (len > 120) continue;
+    const y = b.readUInt16LE(at + 48 + len + 2);
+    if (y < 1900 || y > 2060) continue;
+    per.push({ at, born: y });
+  } }
+const offs = per.map((x) => x.at);
+const nextIdx = (P) => { let lo = 0, hi = offs.length - 1, ans = -1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (offs[m] >= P) { ans = m; hi = m - 1; } else lo = m + 1; }
+  return ans; };
+
+const pts = [], teams = new Map();
+{ let st = -1;
+  for (let p = 0; p <= b.length; p++) {
+    const v = p < b.length ? b[p] : 0;
+    if (v >= 1 && v <= 100) { if (st < 0) st = p; continue; }
+    if (st >= 0 && p - st >= 56) {
+      const a = p - 54; const seen = new Set();
+      for (let k = 0; k < 54; k++) seen.add(b[a + k]);
+      let ok = true;
+      for (let k = 0; k < 14; k++) { const q = a - 16 + k; if (q < 0 || b[q] > 20) { ok = false; break; } }
+      if (seen.size >= 4 && ok && a - 23 >= 0) {
+        const t = b.readUInt32LE(a - 23);
+        if (t > 50 && t < 100000) teams.set(t, (teams.get(t) || 0) + 1);
+        const w = b.subarray(a, Math.min(a + 1400, b.length));
+        const k = w.indexOf(MARK);
+        if (k >= 0) {
+          const o = b.readUInt32LE(a + k + 12);
+          const i = nextIdx(a + 54); const age = i >= 0 ? NOW - per[i].born : 99;
+          if (t > 50 && t < 100000 && o > 50 && o < 100000 && age <= MAXAGE) pts.push({ t, d: (o - 1) - t });
+        } } }
+    st = -1; } }
+pts.sort((x, y) => x.t - y.t);
+const T = pts.map((x) => x.t);
+
+function estimate(t) {
+  let lo = 0, hi = T.length - 1, s = T.length;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (T[m] >= t - WIN) { s = m; hi = m - 1; } else lo = m + 1; }
+  const m2 = new Map();
+  for (let i = s; i < pts.length && pts[i].t <= t + WIN; i++) m2.set(pts[i].d, (m2.get(pts[i].d) || 0) + 1);
+  const top = [...m2.entries()].sort((x, y) => y[1] - x[1])[0];
+  if (!top) return null;
+  const tot = [...m2.values()].reduce((x, y) => x + y, 0);
+  return { d: top[0], n: top[1], tot };
+}
+
+function clubOf(t) {
+  const e = estimate(t);
+  if (!e || e.n < MIN) return null;
+  const id = t + e.d, c = clubs.get(id);
+  return { team: t, tableId: id, name: c ? (c.full || c.short) : null, n: e.n, tot: e.tot };
+}
+
+function realTeams() {
+  return [...teams.entries()].filter(([, c]) => c >= 5).map((x) => x[0]).sort((x, y) => x - y);
+}
+
+return { clubOf, realTeams, pts, clubs };
+}
+module.exports = { buildMapper };
+
+if (require.main !== module) return;
+
+const D = process.argv[2];
+const NOW = Number(process.argv[3]);
+if (!D || !NOW) { console.log("쓰기: node save/clubmap.js <덤프폴더> <올해> [--팀 번호|--저장 파일]"); process.exit(1); }
+const { clubOf, realTeams } = buildMapper(D, NOW);
+
+const argv = process.argv.slice(4);
+const one = argv.indexOf("--팀");
+if (one >= 0) {
+  const t = Number(argv[one + 1]);
+  const r = clubOf(t);
+  console.log(r ? "팀 " + t + " → 구단표 " + r.tableId + "  " + (r.name || "(이름 없음)") +
+                  "   근거 " + r.n + "/" + r.tot : "팀 " + t + " → 모름 (근거가 " + MIN + "건에 못 미친다)");
+  process.exit(0);
+}
+
+const real = realTeams();
+const out = [];
+let prev = -1, mono = 0, named = 0;
+for (const t of real) { const r = clubOf(t); if (!r) continue;
+  out.push(r); if (r.name) named++; if (r.tableId > prev) mono++; prev = r.tableId; }
+console.log("선수 5명 이상인 팀 " + real.length + " · 채택 " + out.length +
+  " (" + (100 * out.length / real.length).toFixed(0) + "%) · 이름 붙음 " + named);
+console.log("자기검사 — 팀 번호가 커지면 구단표 id 도 커지는가: " +
+  (100 * mono / out.length).toFixed(1) + "%   " + (mono / out.length > 0.9 ? "✓" : "✗ 규칙을 다시 볼 것"));
+const save = argv.indexOf("--저장");
+if (save >= 0 && argv[save + 1]) {
+  fs.writeFileSync(argv[save + 1], JSON.stringify(out.map((r) => [r.team, r.tableId, r.name])));
+  console.log("적었다: " + argv[save + 1]);
+} else {
+  console.log("\n표본 12개");
+  for (const r of out.filter((x) => x.name).slice(0, 12))
+    console.log("   팀 " + String(r.team).padStart(6) + " → " + String(r.tableId).padStart(6) + "  " + r.name);
+}
+
+});</script>
+<script>NodeRun.define("clubs.js", function (module, exports, require, process, console, Buffer) {
+
+const fs = require("fs");
+const b = fs.readFileSync(process.argv[2]);
+const okStr = (s) => { if (!s.length) return false;
+  for (const c of s) if (c < 0x20) return false;
+  const t = s.toString("utf8"); return !t.includes("\uFFFD"); };
+const out = []; const seen = new Set();
+for (let p = 40; p + 8 < b.length; p++) {
+  const l1 = b.readUInt32LE(p);
+  if (l1 < 2 || l1 > 90 || p + 8 + l1 > b.length) continue;
+  const s1 = b.slice(p + 4, p + 4 + l1); if (!okStr(s1)) continue;
+  const q = p + 4 + l1, l2 = b.readUInt32LE(q);
+  if (l2 < 2 || l2 > 90 || q + 4 + l2 > b.length) continue;
+  const s2 = b.slice(q + 4, q + 4 + l2); if (!okStr(s2)) continue;
+  const id = b.readUInt32LE(p - 31), id2 = b.readUInt32LE(p - 35);
+
+  if (id !== id2 || id < 1 || id >= 0xfffffffe) continue;
+  const nation = b.readUInt32LE(p - 26);
+  if (nation < 1 || nation > 3000) continue;
+  const key = id + "|" + p;
+  if (seen.has(key)) continue; seen.add(key);
+  out.push({ id, at: p, nation, full: s1.toString("utf8"), short: s2.toString("utf8") });
+}
+console.log("구단 후보", out.length, "| 서로 다른 ID", new Set(out.map(x => x.id)).size);
+const byId = new Map(); for (const c of out) if (!byId.has(c.id)) byId.set(c.id, c);
+for (const id of [679, 601, 675, 1156, 447]) {
+  const c = byId.get(id);
+  console.log("  " + String(id).padStart(6) + "  " + (c ? c.full + "  /  " + c.short + "  (국가 " + c.nation + ")" : "없음"));
+}
+fs.writeFileSync(process.argv[3], JSON.stringify([...byId]));
+
+});</script>
+<script>NodeRun.define("payload.js", function (module, exports, require, process, console, Buffer) {
+"use strict";
+
+const fs = require("fs");
+const path = require("path");
+
+const seasonStr = (y) => y + "-" + String((y + 1) % 100).padStart(2, "0");
+
+const DIV = { 7: "프리미어 리그", 8: "챔피언십", 9: "리그 1", 10: "리그 2",
+  150: "내셔널 리그", 195: "내셔널 리그 노스", 196: "내셔널 리그 사우스" };
+
+function part(label, fn, note) {
+  try {
+    const t = Date.now();
+    const msg = fn();
+    note.ok.push(label + (msg ? " — " + msg : "") + "  (" + (Date.now() - t) + "ms)");
+  } catch (e) {
+    note.skip.push(label + " — 건너뜀: " + e.message);
+  }
+}
+
+const resolver = (base) => (p) => (!p ? null : path.isAbsolute(p) ? p : path.join(base, p));
+
+const needs = (R) => (p, what) => {
+  const v = R(p);
+  if (!v) throw new Error(what + " 경로가 설정에 없다");
+  return v;
+};
+
+function awardNames(archiveDir) {
+  const SRC = fs.readFileSync(path.join(archiveDir, "save", "awards.js"), "utf8");
+  const a0 = SRC.indexOf("const AWARD_NAME = {");
+  const a1 = SRC.indexOf("\n};", a0);
+  if (a0 < 0 || a1 < a0) throw new Error("save/awards.js 에서 AWARD_NAME 을 못 찾았다");
+  const blk = SRC.slice(a0, a1 + 3).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  const M = {};
+  let m; const re = /(\d+)\s*:\s*"([^"]*)"/g;
+  while ((m = re.exec(blk))) M[+m[1]] = m[2];
+  if (!Object.keys(M).length) throw new Error("AWARD_NAME 이 비었다");
+  return M;
+}
+
+const SPEC = {
+  cup:   { size: 18,  H: 8, yoff: 4,  name: "컵 이력" },
+  award: { size: 82,  H: 8, yoff: 0,  name: "수상 이력" },
+  stats: { size: 152, H: 8, yoff: 11, name: "시즌 기록표" },
+};
+const YEAR_LO = 1850, YEAR_HI = 2100, YEAR_MIN = 0.90;
+
+function readSection(file, spec) {
+  const b = fs.readFileSync(file);
+  if (b.length < spec.H + spec.size)
+    throw new Error(spec.name + "이(가) 너무 짧다 — 레코드 하나도 안 들어간다");
+  if ((b.length - spec.H) % spec.size !== 0)
+    throw new Error(spec.name + "이(가) " + spec.size + "바이트로 안 나눠떨어진다 — 이 구획이 아니거나 배치가 다르다");
+  const n = (b.length - spec.H) / spec.size;
+  let ok = 0;
+  for (let i = 0; i < n; i++) {
+    const y = b.readUInt16LE(spec.H + i * spec.size + spec.yoff);
+    if (y >= YEAR_LO && y <= YEAR_HI) ok++;
+  }
+  const rate = ok / n;
+  if (rate < YEAR_MIN)
+    throw new Error(spec.name + "의 연도 칸이 말이 안 된다 (" + (100 * rate).toFixed(1) +
+      "% 만 " + YEAR_LO + "~" + YEAR_HI + " · 진짜 자료는 100%) — 다른 구획이거나 다른 버전이다");
+  return b;
+}
+
+function cupRounds(file) {
+  const b = readSection(file, SPEC.cup), SZ = 18, H = 8;
+  const N = Math.floor((b.length - H) / SZ);
+  const rounds = new Map();
+  for (let i = 0; i < N; i++) {
+    const o = H + i * SZ;
+    if (b[o + 8] === 0) continue;
+    const y = b.readUInt16LE(o + 4), rid = b.readUInt32LE(o);
+    const k = y + "|" + rid;
+    let e = rounds.get(k);
+    if (!e) { e = { y: y, rid: rid, teams: [], flag: new Map() }; rounds.set(k, e); }
+    const t = b.readUInt32LE(o + 14);
+    e.teams.push(t); e.flag.set(t, b[o + 8]);
+  }
+  return rounds;
+}
+
+const PSIG = Buffer.from("01006c0701006c07", "hex");
+function scanPeople(file) {
+  const g = fs.readFileSync(file);
+  const m = new Map();
+  let at = -1;
+  while ((at = g.indexOf(PSIG, at + 1)) >= 0) {
+    const raw = g.readUInt32LE(at + 8);
+    const id = (raw >= 1 && raw <= 400000) ? raw : null;
+    const len = g.readUInt32LE(at + 44); if (len > 120) continue;
+    const born = g.readUInt16LE(at + 48 + len + 2); if (born < 1850 || born > 2200) continue;
+    let full = "";
+    if (len) { full = g.slice(at + 48, at + 48 + len).toString("utf8"); if (/[\x00-\x1f]/.test(full)) continue; }
+
+    let q = -1;
+    for (let p = at - 5, lo = Math.max(0, at - 1200); p >= lo; p--)
+      if (g[p] === 1 && g[p + 1] === 0 && g[p + 2] === 0x6c && g[p + 3] === 7 && g[p + 4] === 0) { q = p; break; }
+    if (q < 0) continue;
+    const u2 = g.readUInt32LE(q + 5); if (u2 === 0xffffffff || u2 === 0) continue;
+    if (!m.has(u2)) m.set(u2, []);
+    m.get(u2).push({ id: id, born: born, full: full, sur: g.readUInt32LE(at + 34) });
+  }
+  return m;
+}
+function peopleUnion(files) {
+  const bad = new Set(), by = new Map();
+  for (const f of files) {
+    const m = scanPeople(f);
+    for (const [u, v] of m) { if (v.length > 1) bad.add(u); else if (!by.has(u)) by.set(u, v[0]); }
+  }
+  for (const u of bad) by.delete(u);
+  return { by: by, dropped: bad.size };
+}
+
+function build(cfg, log) {
+  const say = log || (() => {});
+  const R = resolver(cfg.__base || ".");
+  const NEED = needs(R);
+  const AR = R(cfg.archive);
+  let CLUB = cfg.club.uid;
+  const ME = cfg.club.team, FROM = cfg.from || 2023;
+  const NAT = cfg.nations || {};
+  const D = cfg.dumps || {};
+  const CAPT = cfg.capture || {};
+  const note = { ok: [], skip: [], warn: [] };
+  const out = {};
+
+  out.club = { name: cfg.club.name };
+
+  if (Object.keys(NAT).length) out.nations = NAT;
+
+  let ARC = null, C = null, SQ = null;
+  try {
+    ARC = JSON.parse(fs.readFileSync(NEED(cfg.data, "내보내기(data)"), "utf8"));
+    C = (ARC.clubs || []).find((x) => x.name.indexOf(cfg.club.name) >= 0) || null;
+    if (!C) throw new Error("아카이브에 구단 " + cfg.club.name + " 이 없다");
+  } catch (e) { say("  ⚠ 내보내기 없음 (" + e.message + ") — 내보내기가 필요한 칸은 안 만든다"); ARC = C = null; }
+  try { SQ = JSON.parse(fs.readFileSync(R(cfg.squad), "utf8")); } catch (e) { SQ = null; }
+
+  let HIST = C ? C.history : null;
+  if (!HIST && cfg.history) {
+    try {
+      HIST = JSON.parse(fs.readFileSync(R(cfg.history), "utf8"));
+      say("  연표는 세이브에서 왔다 (" + (HIST.seasons || []).length + "시즌)");
+    } catch (e) { say("  연표 파일을 못 읽었다: " + e.message); HIST = null; }
+  }
+
+  const bridge = (pick) => {
+    const m = new Map();
+    if (!C) return m;
+    for (const s of C.seasons) for (const p of s.players) {
+      const k = (p.fullName || p.name).split(" ").slice(-1)[0] + "|" + p.joined;
+      if (!m.has(k)) m.set(k, new Set());
+      m.get(k).add(pick(p));
+    }
+    return m;
+  };
+
+  part("① 연표·선수단·곡선", () => {
+    if (!HIST) throw new Error("연표가 없다 (내보내기도, 세이브에서 짠 연표도 없다)");
+    if (C) {
+      out.club = Object.assign({ name: C.name }, C.meta, { manager: C.manager });
+      out.generatedAt = ARC.generatedAt;
+    }
+    out.savedAt = HIST.savedAt;
+
+    const exSeason = new Map(C ? C.seasons.map((s) => [s.season, s]) : []);
+    out.timeline = HIST.seasons.map((h) => {
+
+      const fin = h.cups.filter((c) => c.teams === 2);
+      const win = fin.filter((c) => c.result === "우승").length;
+      const lose = fin.filter((c) => c.result === "준우승").length;
+      const ex = exSeason.get(h.season);
+      return { season: h.season, division: h.division,
+        divName: DIV[h.division] || ("디비전 " + h.division),
+        standing: h.standing, why: h.why, stats: h.stats,
+        cups: { finals: fin.length, win: win, lose: lose, unk: fin.length - win - lose,
+          deepest: h.cups.length ? Math.min.apply(null, h.cups.map((c) => c.teams)) : null,
+          rounds: h.cups.length },
+
+        squadSize: ex ? ex.players.length : (C ? 0 : (h.squadSize || 0)), hasSquad: !!ex };
+    });
+
+    if (SQ) {
+      const nick = bridge((p) => p.localName || p.name);
+      const full = bridge((p) => p.fullName || p.name);
+      out.squad = SQ.squad.map((p) => {
+        const k = p.name + "|" + p.joined;
+        const v1 = nick.get(k), v2 = full.get(k);
+        return { name: p.name, age: p.age, dob: p.dob, num: p.number, ca: p.ca, pa: p.pa,
+          wage: p.wage, to: p.contractTo, joined: p.joined, grade: p.squad,
+          lgApp: p.lgApp, lgGoal: p.lgGoal, acApp: p.acApp, acGoal: p.acGoal,
+          pos: Object.keys(p.positions).filter((t) => p.positions[t] >= 15),
+          local: (v1 && v1.size === 1) ? [...v1][0] : null,
+          full: (v2 && v2.size === 1) ? [...v2][0] : null };
+      });
+    }
+
+    if (!C) return "시즌 " + out.timeline.length + " (세이브에서 짠 연표 — 선수단·곡선은 내보내기가 있어야 한다)";
+    const paBy = new Map(SQ ? SQ.squad.map((p) => [p.name + "|" + p.joined, p.pa]) : []);
+    const by = new Map();
+    for (const s of C.seasons) for (const p of s.players) {
+      const k = p.fullName || p.name;
+      if (!by.has(k)) by.set(k, { name: p.localName || p.name, full: k, pts: [], joined: p.joined });
+      by.get(k).pts.push({ season: s.season, ca: p.ca });
+    }
+    out.curves = [...by.values()].filter((v) => v.pts.length >= 3).map((v) => {
+      const sur = v.full.split(" ").slice(-1)[0];
+      const pa = paBy.get(sur + "|" + v.joined);
+      return { name: v.name, n: v.pts.length, pts: v.pts, pa: pa == null ? null : pa,
+        gain: v.pts[v.pts.length - 1].ca - v.pts[0].ca };
+    }).sort((a, b) => b.gain - a.gain);
+
+    return "시즌 " + out.timeline.length + " · 선수 " + (out.squad ? out.squad.length : 0) +
+      " · 곡선 " + out.curves.length;
+  }, note);
+
+  part("② 시즌별 명단", () => {
+    if (!C) throw new Error("내보내기가 없다");
+    out.rosters = C.seasons.map((s) => ({
+      season: s.season, n: s.players.length,
+      top: s.players.slice().sort((a, b) => (b.ca || 0) - (a.ca || 0)).slice(0, 5)
+        .map((p) => ({ name: p.localName || p.name, full: p.fullName || p.name,
+          ca: p.ca, pa: p.pa, num: p.number, pos: null })) }));
+    return out.rosters.length + "시즌";
+  }, note);
+
+  part("③ 시즌 팀 기록", () => {
+    const b = readSection(NEED(D.stats, "시즌 기록표(dumps.stats)"), SPEC.stats), SZ = 152, H = 8;
+    const rec = new Map();
+    for (let p = H; p + SZ <= b.length; p += SZ) {
+      if (b.readUInt32LE(p + 1) !== ME || b[p + 31] !== 1) continue;
+      const y = b.readUInt16LE(p + 11);
+      if (y < 2020 || y > 2060) continue;
+      let e = rec.get(y);
+      if (!e) { e = { app: 0, goal: 0, assist: 0, motm: 0, rate: 0, rows: 0 }; rec.set(y, e); }
+      e.rows++;
+      const app = b[p + 24] + b[p + 25], rated = b[p + 26];
+      if (app > e.app) e.app = app;
+      if (b[p + 27] > e.goal) e.goal = b[p + 27];
+      if (b[p + 28] > e.assist) e.assist = b[p + 28];
+      if (b[p + 29] > e.motm) e.motm = b[p + 29];
+
+      if (rated >= 10) { const r = b.readUInt16LE(p + 13) / 10 / rated; if (r > e.rate) e.rate = +r.toFixed(2); }
+    }
+    out.records = [...rec].sort((a, c) => a[0] - c[0])
+      .map(([y, e]) => Object.assign({ season: seasonStr(y) }, e));
+    return out.records.length + "시즌";
+  }, note);
+
+  part("④ 트로피 진열대", () => {
+    const rounds = cupRounds(NEED(D.cup, "컵 이력(dumps.cup)"));
+
+    let nameOf = () => null;
+    try {
+      const mp = require(path.join(AR, "save", "clubmap.js")).buildMapper(R(D.clubmapDir), cfg.clubmapYear);
+      if (mp && mp.clubOf) nameOf = (t) => { const r = mp.clubOf(t);
+        return r && r.name ? { name: r.name, conf: r.tot ? +(r.n / r.tot).toFixed(2) : null } : null; };
+    } catch (e) { say("  구단 이름 추정 실패: " + e.message); }
+
+    const seen = new Set(), byYear = new Map();
+    for (const e of rounds.values()) {
+      if (!e.flag.has(ME)) continue;
+      const key = e.y + "|" + e.teams.slice().sort((x, z) => x - z).join(",");
+      if (seen.has(key)) continue; seen.add(key);
+      const three = [...e.flag.values()].filter((x) => x === 3).length;
+      let r;
+      if (e.teams.length === 2 && three === 1) r = e.flag.get(ME) === 3 ? "준우승" : "우승";
+      else if (e.teams.length === 2) r = "결승";
+      else r = e.teams.length + "강";
+      const foe = e.teams.length === 2 ? e.teams.find((t) => t !== ME) : null;
+      if (!byYear.has(e.y)) byYear.set(e.y, []);
+      byYear.get(e.y).push({ r: r, teams: e.teams.length, foe: foe, foeName: foe ? nameOf(foe) : null });
+    }
+    const ORD = { "우승": 0, "준우승": 1, "결승": 2 };
+    out.trophies = [...byYear].sort((a, c) => a[0] - c[0]).map(([y, v]) => ({
+      season: seasonStr(y),
+      items: v.filter((x) => ORD[x.r] != null).sort((a, c) => ORD[a.r] - ORD[c.r]),
+      deepest: Math.min.apply(null, v.map((x) => x.teams)) }));
+    return out.trophies.length + "시즌 · 우승 " +
+      out.trophies.reduce((a, s) => a + s.items.filter((x) => x.r === "우승").length, 0);
+  }, note);
+
+  part("⑤ 컵 여정", () => {
+    const rounds = cupRounds(NEED(D.cup, "컵 이력(dumps.cup)"));
+    const SAME = cfg.runSame == null ? 120 : cfg.runSame;
+    const GAP = cfg.runGap == null ? 15 : cfg.runGap;
+    const mine = new Map(), seen = new Map();
+    for (const e of rounds.values()) {
+      if (!e.flag.has(ME)) continue;
+      const key = e.y + "|" + e.teams.slice().sort((x, z) => x - z).join(",");
+      const prior = seen.get(key);
+      if (prior && prior.some((r) => Math.abs(r - e.rid) <= SAME)) continue;
+      if (prior) prior.push(e.rid); else seen.set(key, [e.rid]);
+      const three = [...e.flag.values()].filter((x) => x === 3).length;
+      let r = null;
+      if (e.teams.length === 2) r = three === 1 ? (e.flag.get(ME) === 3 ? "준우승" : "우승") : "결승";
+      if (!mine.has(e.y)) mine.set(e.y, []);
+      mine.get(e.y).push({ rid: e.rid, n: e.teams.length, r: r,
+        foe: e.teams.length === 2 ? e.teams.find((t) => t !== ME) : null });
+    }
+    let ok = 0, bad = 0;
+    out.runs = [...mine].sort((a, c) => a[0] - c[0]).map(([y, list]) => {
+      list.sort((a, c) => a.rid - c.rid);
+      const groups = [];
+      for (const it of list) {
+        const g = groups[groups.length - 1];
+
+        const near = g && it.rid - g[g.length - 1].rid <= GAP;
+        const shrinking = g && it.n <= g[g.length - 1].n;
+        if (near && shrinking) g.push(it); else groups.push([it]);
+      }
+      for (const g of groups) {
+        const ns = g.map((x) => x.n);
+        ns.every((v, i) => i === 0 || v <= ns[i - 1]) ? ok++ : bad++;
+      }
+      return { season: seasonStr(y), runs: groups.map((g) => ({
+        from: Math.max.apply(null, g.map((x) => x.n)),
+        to: Math.min.apply(null, g.map((x) => x.n)),
+        rid: g[0].rid,
+        result: (g.find((x) => x.r) || {}).r || (Math.min.apply(null, g.map((x) => x.n)) + "강"),
+        foe: (g.find((x) => x.foe) || {}).foe || null })) };
+    });
+    return "단조 감소 " + ok + " · 어긋남 " + bad + " (" + (100 * ok / (ok + bad)).toFixed(1) + "%)";
+  }, note);
+
+  part("⑥ 대회 이름(캡처)", () => {
+    if (!CAPT.cups || !CAPT.cups.length) throw new Error("캡처 정답지가 없다");
+    if (!out.runs) throw new Error("컵 여정이 없다");
+    const want = new Map();
+    const add = (y, comp, result) => {
+      if (y < FROM || (cfg.until && y > cfg.until)) return;
+      if (!want.has(y)) want.set(y, []);
+      want.get(y).push({ comp: comp, result: result });
+    };
+    for (const c of CAPT.cups) {
+      for (const y of (c.win || [])) add(c.summer ? y : y - 1, c, "우승");
+      for (const y of (c.lose || [])) add(c.summer ? y : y - 1, c, "준우승");
+    }
+    const mine = new Map(out.runs.map((s) => [+s.season.slice(0, 4),
+      s.runs.filter((r) => r.result === "우승" || r.result === "준우승" || r.result === "결승")]));
+    let agree = 0, differ = 0;
+    for (const y of [...new Set([...want.keys(), ...mine.keys()])].sort()) {
+      ((want.get(y) || []).length === (mine.get(y) || []).length) ? agree++ : differ++;
+    }
+    let named = 0, unnamed = 0;
+    out.runs = out.runs.map((s) => {
+      const y = +s.season.slice(0, 4);
+      const pool = (want.get(y) || []).slice();
+      return { season: s.season, runs: s.runs.map((r) => {
+        if (r.result !== "우승" && r.result !== "준우승" && r.result !== "결승") return r;
+
+        const single = r.from === 2;
+        let i = pool.findIndex((c) => c.result === r.result && !!c.comp.summer === single);
+        if (i < 0) i = pool.findIndex((c) => !!c.comp.summer === single);
+        if (i < 0) i = pool.findIndex((c) => c.result === r.result);
+        if (i < 0) i = pool.length ? 0 : -1;
+        if (i < 0) { unnamed++; return r; }
+        const c = pool.splice(i, 1)[0];
+        named++;
+
+        return Object.assign({}, r, { comp: c.comp.name, short: c.comp.short,
+          result: r.result === "결승" ? c.result : r.result, byCapture: r.result === "결승" });
+      }) };
+    });
+    out.honours = CAPT.cups.map((c) => ({ name: c.name, short: c.short, win: c.win, lose: c.lose }));
+    if (CAPT.leagues) out.leagues = CAPT.leagues;
+    return "결승 수 일치 " + agree + "해 · 어긋남 " + differ + "해 · 이름 붙음 " + named + " · 못 붙임 " + unnamed;
+  }, note);
+
+  part("⑦ 월드컵", () => {
+    const rid = (cfg.rounds || {}).worldcup;
+    if (!rid) throw new Error("월드컵 라운드 번호가 설정에 없다");
+    const rounds = cupRounds(NEED(D.cup, "컵 이력(dumps.cup)"));
+    const byYear = new Map();
+    for (const e of rounds.values()) {
+      if (e.rid !== rid) continue;
+      byYear.set(e.y, e.teams.map((t) => ({ t: t, f: e.flag.get(t) })));
+    }
+    out.worldcup = [...byYear].filter(([, v]) => v.length === 2).sort((a, c) => a[0] - c[0])
+      .map(([y, v]) => {
+        const w = v.find((x) => x.f !== 3), l = v.find((x) => x.f === 3);
+        return { year: y, win: w ? w.t : null, winName: w ? (NAT[w.t] || null) : null,
+          lose: l ? l.t : null, loseName: l ? (NAT[l.t] || null) : null };
+      });
+    return out.worldcup.map((x) => x.year + ":" + (x.winName || x.win)).join(" ");
+  }, note);
+
+  part("⑦ 아시안 컵", () => {
+    const rid = (cfg.rounds || {}).asiancup;
+    if (!rid) throw new Error("아시안 컵 라운드 번호가 설정에 없다");
+    const c = readSection(NEED(D.asiancup || D.cup, "컵 이력(dumps.asiancup)"), SPEC.cup), H = 8, SZ = 18;
+    const N = Math.floor((c.length - H) / SZ);
+    const by = new Map();
+    for (let i = 0; i < N; i++) {
+      const o = H + i * SZ;
+      if (c.readUInt32LE(o) !== rid) continue;
+      const s = c.readUInt16LE(o + 4), k = c[o + 8], t = c.readUInt32LE(o + 14);
+      if (!by.has(s)) by.set(s, {});
+      if (k === 2) by.get(s).win = t; else if (k === 3) by.get(s).lose = t;
+    }
+
+    out.asiancup = [...by].filter(([s, v]) => s >= (cfg.asiancupFrom || FROM) && v.win)
+      .sort((a, b) => a[0] - b[0])
+      .map(([s, v]) => ({ season: s, year: s + 1, win: v.win, winName: NAT[v.win] || null,
+        lose: v.lose, loseName: NAT[v.lose] || null }));
+    return out.asiancup.map((x) => x.year + ":" + (x.winName || x.win)).join(" ");
+  }, note);
+
+  part("⑧ 감독 재임", () => {
+    const b = fs.readFileSync(NEED(D.manager, "감독 기록(dumps.manager)"));
+    const SIG = Buffer.from("15ffffffffffff", "hex");
+    const byTeam = new Map();
+    let a = -1;
+    while ((a = b.indexOf(SIG, a + 1)) >= 0) {
+      const id = b.readUInt32LE(a + 7);
+      if (id < 1 || id > 400000) continue;
+      const team = b.readUInt32LE(a + 12);
+      const day = b.readUInt16LE(a + 16) & 0x1ff, y = b.readUInt16LE(a + 18);
+      if (y < 2000 || y > 2060 || day < 1 || day > 366) continue;
+      if (!byTeam.has(team)) byTeam.set(team, new Set());
+      byTeam.get(team).add(y);
+    }
+
+    if (!byTeam.size) throw new Error("감독 기록에서 레코드를 하나도 못 찾았다 — 이 구획이 아니거나 배치가 다르다");
+    out.spells = [...byTeam].map(([team, ys]) => {
+      const a2 = [...ys].sort();
+      return { team: team, name: NAT[team] || null, from: a2[0], to: a2[a2.length - 1], years: a2.length };
+    }).sort((x, z) => x.from - z.from || z.years - x.years);
+    return out.spells.length + "곳";
+  }, note);
+
+  if (cfg.club.uid == null) {
+    part("⑨-0 수상 구단 번호 유도", () => {
+      const mp = require(path.join(AR, "save", "clubmap.js")).buildMapper(NEED(D.clubmapDir, "이름표 폴더(dumps.clubmapDir)"), cfg.clubmapYear);
+      const r = mp && mp.clubOf ? mp.clubOf(ME) : null;
+      if (!r || !(r.full || r.name)) throw new Error("기록표 번호 " + ME + " 에 구단 이름을 못 붙였다");
+      const nm = r.full || r.name;
+      const clubs = new Map(JSON.parse(fs.readFileSync(
+        NEED(D.clubsJson || (D.clubmapDir + "/clubs.json"), "이름표(dumps.clubsJson)"), "utf8")));
+      let hit = null;
+      for (const [id, v] of clubs) if (v.full === nm || v.short === nm) { hit = id; break; }
+      if (hit == null) for (const [id, v] of clubs) if (v.full.indexOf(nm) >= 0) { hit = id; break; }
+      if (hit == null) throw new Error("이름표에서 \"" + nm + "\" 을 못 찾았다");
+      CLUB = hit + 1;
+
+      if (!out.club || !out.club.name) out.club = Object.assign({}, out.club, { name: nm, nameGuess: true });
+      const conf = r.tot ? Math.round(100 * r.n / r.tot) : null;
+      if (conf != null && conf < 40)
+        note.warn.push("구단 이름 추정이 얇다 (근거 " + conf + "%) — 수상이 남의 구단 것일 수 있다");
+      return ME + " → " + nm + " → 이름표 " + hit + " → 수상표 " + CLUB + (conf != null ? " (근거 " + conf + "%)" : "");
+    }, note);
+  }
+
+  let PEOPLE = null, NAMEOF = null, AWARD = null;
+  part("⑨ 사람 표 · 상 이름", () => {
+    AWARD = awardNames(AR);
+    const gdbs = (D.gameDb || []).map(R);
+    if (!gdbs.length) throw new Error("game_db 가 설정에 없다");
+    const u = peopleUnion(gdbs);
+    PEOPLE = u.by;
+
+    let NAMES = new Map(), DICT = new Map();
+    try { NAMES = require(path.join(AR, "save", "names.js")).build(AR, { club: cfg.club.name }); } catch (e) {}
+    try { DICT = require(path.join(AR, "save", "names.js")).dictionary(fs.readFileSync(gdbs[0])); } catch (e) {}
+    NAMEOF = (u2) => {
+      const p = PEOPLE.get(u2); if (!p) return null;
+      const n = p.id != null ? NAMES.get(p.id) : null;
+      return (n && (n.localName || n.fullName || n.name)) || p.full || DICT.get(p.sur) ||
+        (p.id != null ? "사람" + p.id : null);
+    };
+    return "UID2→사람 " + PEOPLE.size + " (덤프 " + gdbs.length + "개 합집합 · 애매한 " + u.dropped +
+      "개 버림) · 상 이름 " + Object.keys(AWARD).length + "종";
+  }, note);
+
+  part("⑨ 수상", () => {
+    if (!PEOPLE) throw new Error("사람 표가 없다");
+    const MGR = new Set(cfg.managerAwards || [97, 99, 101, 103]);
+    const b = readSection(NEED(D.award, "수상 이력(dumps.award)"), SPEC.award), SZ = 82, H = 8;
+    const N = (b.length - H) / SZ;
+    const rows = [];
+    for (let i = 0; i < N; i++) {
+      const o = H + i * SZ, y = b.readUInt16LE(o);
+      if (y < 1889 || y > 2100) continue;
+      rows.push({ y: y, a: b.readUInt16LE(o + 2), who: b.readUInt32LE(o + 4),
+        club: b.readUInt32LE(o + 8), age: b[o + 12] });
+    }
+    const mine = rows.filter((r) => r.club === CLUB && r.y >= FROM);
+    const byWho = new Map();
+    for (const r of mine) { if (!byWho.has(r.who)) byWho.set(r.who, []); byWho.get(r.who).push(r); }
+
+    const players = [...byWho].map(([u2, rs]) => {
+      const onlyMgr = rs.every((r) => MGR.has(r.a));
+      const yrs = [...new Set(rs.map((r) => r.y))].sort();
+      const t = new Map(); for (const r of rs) t.set(r.a, (t.get(r.a) || 0) + 1);
+      return { uid2: u2, name: NAMEOF(u2) || (onlyMgr ? (cfg.managerName || null) : null), manager: onlyMgr,
+        total: rs.length, kinds: t.size, from: yrs[0], to: yrs[yrs.length - 1],
+        named: [...t].filter(([a]) => AWARD[a]).map(([a, c]) => ({ name: AWARD[a], n: c }))
+          .sort((x, z) => z.n - x.n),
+        perYear: yrs.map((y) => [y, rs.filter((r) => r.y === y).length]) };
+    }).sort((a, c) => c.total - a.total);
+
+    const golden = rows.filter((r) => r.a === 0 && r.y >= FROM).sort((a, c) => a.y - c.y)
+      .map((r) => ({ year: r.y, name: NAMEOF(r.who) || ("UID2 " + r.who), age: r.age, mine: r.club === CLUB }));
+
+    let lee = null;
+    if (cfg.star) {
+      const rs = rows.filter((r) => r.who === cfg.star && r.y >= FROM);
+      lee = { name: NAMEOF(cfg.star), total: rs.length, years: [], kinds: new Set(rs.map((r) => r.a)).size };
+      for (const y of [...new Set(rs.map((r) => r.y))].sort()) {
+        const v = rs.filter((r) => r.y === y);
+        lee.years.push({ year: y, n: v.length, age: v[0].age,
+          named: [...new Set(v.map((r) => r.a))].filter((a) => AWARD[a]).map((a) => AWARD[a]) });
+      }
+    }
+    out.awards = { players: players, golden: golden, lee: lee, total: mine.length,
+      winners: byWho.size, kinds: new Set(mine.map((r) => r.a)).size,
+      named: Object.keys(AWARD).length, dump: cfg.awardDumpLabel || null };
+
+    const noName = players.filter((p) => !p.name).length;
+
+    if (byWho.size && noName / byWho.size > 0.6)
+      note.warn.push("우리 수상자 " + byWho.size + "명 중 " + noName + "명에 이름이 안 붙었다 — game_db 가 온전한지 볼 것");
+    return mine.length + "회 · 수상자 " + byWho.size + " · 이름 못 붙은 수상자 " + noName + "명";
+  }, note);
+
+  part("⑨ 포디움", () => {
+    if (!PEOPLE) throw new Error("사람 표가 없다");
+    const b = readSection(NEED(D.award, "수상 이력(dumps.award)"), SPEC.award), SZ = 82, H = 8, SLOT = 26, BASE = 4;
+    const N = (b.length - H) / SZ;
+    const all = [];
+    for (let i = 0; i < N; i++) {
+      const o = H + i * SZ, y = b.readUInt16LE(o);
+      if (y < FROM || y > 2100) continue;
+      const award = b.readUInt16LE(o + 2);
+      if (!AWARD[award]) continue;
+      const place = [];
+      for (let s = 0; s < 3; s++) {
+        const p = o + BASE + SLOT * s, u = b.readUInt32LE(p);
+        if (u === 0 || u === 0xffffffff) { place.push(null); continue; }
+        place.push({ name: NAMEOF(u) || ("UID2 " + u), age: b[p + 8], mine: b.readUInt32LE(p + 4) === CLUB });
+      }
+      if (place.every((x) => !x)) continue;
+      all.push({ award: award, y: y, place: place });
+    }
+    const byAward = new Map();
+    for (const r of all) { if (!byAward.has(r.award)) byAward.set(r.award, []); byAward.get(r.award).push(r); }
+
+    out.podium = [...byAward].map(([a, v]) => ({
+      id: a, name: AWARD[a], mine: v.some((r) => r.place.some((q) => q && q.mine)),
+      seasons: v.sort((x, z) => x.y - z.y).map((r) => ({ y: r.y, p: r.place })) }))
+      .sort((x, z) => (z.mine - x.mine) || (z.seasons.length - x.seasons.length) || x.id - z.id);
+    return "상 " + out.podium.length + "종 · 시즌카드 " + all.length + "장 · 우리가 오른 상 " +
+      out.podium.filter((x) => x.mine).length + "종";
+  }, note);
+
+  part("⑩ 트로피 사진(캡처)", () => {
+    out.cupPix = JSON.parse(fs.readFileSync(NEED(CAPT.cupPix, "트로피 사진(capture.cupPix)"), "utf8"));
+    return Object.keys(out.cupPix).length + "개";
+  }, note);
+  part("⑩ 올해의 팀", () => {
+    out.bestxi = JSON.parse(fs.readFileSync(NEED(CAPT.bestxi, "올해의 팀(capture.bestxi)"), "utf8"));
+    return out.bestxi.length + "개";
+  }, note);
+
+  const ORDER = ["club", "generatedAt", "savedAt", "timeline", "squad", "curves",
+    "trophies", "records", "rosters", "runs", "leagues", "honours",
+    "worldcup", "spells", "awards", "podium", "cupPix", "asiancup", "bestxi", "nations"];
+  const tidy = {};
+  for (const k of ORDER) if (k in out) tidy[k] = out[k];
+  for (const k of Object.keys(out)) if (!(k in tidy)) tidy[k] = out[k];
+
+  return { payload: tidy, note: note };
+}
+
+if (require.main === module) {
+  const argv = process.argv.slice(2);
+  let src = null, dest = null;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--out") dest = argv[++i];
+    else if (!src) src = argv[i];
+  }
+  if (!src) { console.log("쓰기: node payload.js <설정.json> [--out payload.json]"); process.exit(1); }
+  const cfg = JSON.parse(fs.readFileSync(src, "utf8"));
+  cfg.__base = path.dirname(path.resolve(src));
+  const r = build(cfg, console.log);
+  for (const s of r.note.ok) console.log("  " + s);
+  for (const s of r.note.warn) console.log("  ⚠ " + s);
+  for (const s of r.note.skip) console.log("  ⚠ " + s);
+  const json = JSON.stringify(r.payload);
+  const out = dest || path.join(__dirname, "payload.json");
+  fs.writeFileSync(out, json);
+  console.log("칸 " + Object.keys(r.payload).length + "개 · " + (json.length / 1024).toFixed(0) + "KB → " + out);
+  if (r.note.skip.length) console.log("건너뛴 갈래 " + r.note.skip.length + "개 — 그 칸은 자료에 없다");
+}
+
+module.exports = { build, awardNames, cupRounds, scanPeople, peopleUnion };
+
+});</script>
 <script>
 "use strict";
 
@@ -2823,6 +5383,8 @@ async function boot() {
   const web = await loadModule("platform-web.js");
   core = await loadModule("core.js");
   render = await loadModule("render.js");
+
+  try { await loadModule("spa.js"); } catch (e) { console.warn("spa.js 없음:", e.message); }
   platform = web.makePlatform(window.fzstd);
   core.configure(platform);
   return core;
@@ -3248,16 +5810,129 @@ function deepRender(res) {
     parts + '<p class="note">구단 이름과 선수 이름은 아직 안 붙었습니다 — 그건 game_db(232MB) 가 필요합니다.</p></div>';
 }
 
+const SPA_NEED = ["person_record_manager", "player_stats_hist_dt", "tc_league_history_dt",
+  "tc_cup_history_dt", "award_year_hist_dt"];
+
+async function spaBuild(file, wantNames, say) {
+  const parse = REG["parse.js"], Bytes = REG["platform-web.js"].Bytes;
+  if (!window.NodeRun) throw new Error("깊이 읽기 부분이 안 실려 있다 (한 장으로 묶은 판에서만 된다)");
+  NodeRun.clear();
+  NodeRun.setBytes(Bytes);
+
+  say("목록 읽는 중 — 파일 꼬리 4MB");
+  const TAIL = 4 * 1024 * 1024;
+  const tail = platform.from(new Uint8Array(await file.slice(Math.max(0, file.size - TAIL)).arrayBuffer()));
+  const idx = parse.readIndexFromTail(tail, file.name);
+
+  const grab = async (name) => {
+    const e = idx.entries.find((x) => x.name === name);
+    if (!e) return null;
+    say("읽는 중 " + name + " — " + (e.stored / 1048576).toFixed(0) + "MB");
+    const at = idx.dataStart + e.offset;
+    const raw = platform.from(new Uint8Array(await file.slice(at, at + e.stored).arrayBuffer()));
+    const out = platform.zstdDecompress(raw);
+    const vp = "/save/" + name + "." + e.ext.replace(/^\./, "");
+    NodeRun.put(vp, out);
+    return { path: vp, mb: out.length / 1048576 };
+  };
+
+  const at = {};
+  let mb = 0;
+  for (const name of SPA_NEED) {
+    const g = await grab(name);
+    if (!g) throw new Error("세이브에 " + name + " 구획이 없다");
+    at[name] = g.path; mb += g.mb;
+  }
+
+  let gdb = null;
+  if (wantNames) {
+    const g = await grab("game_db");
+    if (g) { gdb = g.path; mb += g.mb;
+      say("이름표 만드는 중");
+      const r = NodeRun.run("clubs.js", [gdb, "/save/clubs.json"]);
+      if (r.error) say("이름표 실패: " + r.error.message);
+    }
+  } else {
+    const e = idx.entries.find((x) => x.name === "game_db");
+    if (e) {
+      const at0 = idx.dataStart + e.offset;
+      const head = platform.from(new Uint8Array(await file.slice(at0, at0 + Math.min(e.stored, 1 << 20)).arrayBuffer()));
+      try { NodeRun.put("/save/game_db.dat", platform.zstdDecompress(head).slice(0, 64)); } catch (e2) {}
+    }
+  }
+
+  say("감독 기록 읽는 중");
+  const mgr = NodeRun.run("manager.js", [at["person_record_manager"]]);
+  if (mgr.error) throw mgr.error;
+  const teams = (mgr.exports && mgr.exports.teams) || [];
+  if (!teams.length) throw new Error("감독 기록에서 구단 번호를 못 찾았다");
+
+  const me = teams[0].team;
+
+  say("시즌 순위 짜는 중");
+  let histPath = null;
+  {
+    const r2 = NodeRun.run("season.js", ["/save", String(me), "/hist.json"]);
+    if (r2.error) say("연표 실패: " + r2.error.message);
+    else histPath = "/hist.json";
+  }
+
+  const yr = (mgr.exports && mgr.exports.byYear) || [];
+  const now = yr.length ? yr[yr.length - 1].year : 2038;
+
+  const cfg = {
+    __base: "/",
+    club: { name: "", team: me },
+    from: 2023,
+    archive: "/ar",
+    data: "/없음.json", squad: "/없음.json",
+    history: histPath,
+    dumps: {
+      cup: at["tc_cup_history_dt"],
+      asiancup: at["tc_cup_history_dt"],
+      stats: at["player_stats_hist_dt"],
+      manager: at["person_record_manager"],
+      award: at["award_year_hist_dt"],
+      gameDb: gdb ? [gdb] : [],
+      clubmapDir: gdb ? "/save" : null,
+      clubsJson: gdb ? "/save/clubs.json" : null,
+    },
+    clubmapYear: now,
+    rounds: { worldcup: 473, asiancup: 3221 },
+    capture: {},
+  };
+
+  if (window.__AWARDS_SRC) NodeRun.put("/ar/save/awards.js", window.__AWARDS_SRC);
+  NodeRun.put("/cfg.json", JSON.stringify(cfg));
+
+  say("자료 만드는 중 — 열 갈래");
+  const r = NodeRun.run("payload.js", ["/cfg.json", "--out", "/payload.json"]);
+  if (r.error) throw r.error;
+  const v = r.files.get("/payload.json");
+  const payload = JSON.parse(typeof v === "string" ? v : new TextDecoder().decode(v));
+  const log = r.log.slice();
+  NodeRun.clear();
+  return { payload: payload, log: log, mb: Math.round(mb), team: me };
+}
+
 function deepPanel() {
   const box = $("deep");
   if (!box) return;
   if (!SAVE_FILES.size || !window.NodeRun) { box.innerHTML = ""; return; }
+  const names = [...SAVE_FILES.keys()];
   box.innerHTML = '<div class="deepbox"><h3>세이브 깊이 읽기</h3>' +
     '<p class="note">내보내기가 없어도 세이브만으로 시즌·순위·컵을 읽습니다. 필요한 부분만 떠오므로 파일 전체를 열지 않습니다.</p>' +
-    [...SAVE_FILES.keys()].map((n, i) =>
+    names.map((n, i) =>
       '<button type="button" class="deepbtn" data-i="' + i + '">' + esc(n) + " 읽기</button>").join(" ") +
+
+    '<h4 style="margin-top:18px">커리어 한 장 만들기</h4>' +
+    '<p class="note">감독 · 구단 · 선수 탭 셋으로 된 화면을 만듭니다. 수상과 포디움까지 읽습니다.<br>' +
+    '<b>이름까지</b> 붙이려면 <code>game_db</code>(235MB) 를 더 읽어야 해서 느리고 메모리를 많이 씁니다. ' +
+    '이름 없이 만들면 사람과 구단이 번호로 남습니다.</p>' +
+    names.map((n, i) =>
+      '<button type="button" class="spabtn" data-i="' + i + '" data-names="1">' + esc(n) + " — 이름까지</button> " +
+      '<button type="button" class="spabtn" data-i="' + i + '" data-names="0">이름 없이 (빠름)</button>').join("<br>") +
     '<div id="deeplog" class="note"></div><div id="deepout"></div></div>';
-  const names = [...SAVE_FILES.keys()];
   box.querySelectorAll(".deepbtn").forEach(function (b) {
     b.addEventListener("click", async function () {
       const f = SAVE_FILES.get(names[Number(b.getAttribute("data-i"))]);
@@ -3276,9 +5951,41 @@ function deepPanel() {
       box.querySelectorAll(".deepbtn").forEach((x) => { x.disabled = false; });
     });
   });
+
+  box.querySelectorAll(".spabtn").forEach(function (b) {
+    b.addEventListener("click", async function () {
+      const f = SAVE_FILES.get(names[Number(b.getAttribute("data-i"))]);
+      const wantNames = b.getAttribute("data-names") === "1";
+      const log = $("deeplog"), outEl = $("deepout");
+      outEl.innerHTML = "";
+      const all = box.querySelectorAll(".deepbtn, .spabtn");
+      all.forEach((x) => { x.disabled = true; });
+      const t0 = Date.now();
+      try {
+        const r = await spaBuild(f, wantNames, (m) => { log.textContent = m; });
+        const spa = REG["spa.js"];
+        if (!spa || !spa.html) throw new Error("화면 만드는 부분(spa.js)이 안 실려 있다");
+        document.getElementById("aframe").srcdoc = spa.html(JSON.stringify(r.payload));
+        document.getElementById("aname").textContent =
+          f.name + " · 구단 번호 " + r.team + " · " + r.mb + "MB 읽음" + (wantNames ? "" : " · 이름 없음");
+        $("result").hidden = true;
+        $("archive").hidden = false;
+        history.pushState({ archive: "spa" }, "", "#커리어");
+        log.textContent = ((Date.now() - t0) / 1000).toFixed(1) + "초 걸렸습니다";
+
+        const skip = r.log.filter((x) => x.indexOf("건너뜀") >= 0);
+        const warn = r.log.filter((x) => x.indexOf("⚠") >= 0 && x.indexOf("건너뜀") < 0);
+        if (skip.length || warn.length)
+          outEl.innerHTML = '<p class="note">' +
+            (warn.length ? warn.map(esc).join("<br>") + "<br>" : "") +
+            (skip.length ? "못 만든 칸 " + skip.length + "개 — " + esc(skip.join(" / ")) : "") + "</p>";
+      } catch (e) {
+        log.textContent = "만들지 못했습니다: " + e.message;
+        console.error(e);
+      }
+      all.forEach((x) => { x.disabled = false; });
+    });
+  });
 }
 
 </script>
-
-</body>
-</html>
