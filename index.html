@@ -1,0 +1,2513 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>FM 커리어 아카이브</title>
+</head>
+<body>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ctext y=%2726%27 font-size=%2726%27%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f6f5f2; --panel:#fffefb; --line:#e2ded4; --ink:#232019; --ink-2:#5c564a;
+  --ink-3:#8b8474; --accent:#1f6f4a; --accent-soft:#e6f0e9;
+  --ok:#1f6f4a; --guess:#8a6a1f; --none:#8b8474;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16150f; --panel:#1e1d16; --line:#33312a; --ink:#f0ede4; --ink-2:#b6b0a2;
+    --ink-3:#847e70; --accent:#67c295; --accent-soft:#1d3129;
+    --ok:#67c295; --guess:#d6ac57; --none:#847e70;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16150f; --panel:#1e1d16; --line:#33312a; --ink:#f0ede4; --ink-2:#b6b0a2;
+  --ink-3:#847e70; --accent:#67c295; --accent-soft:#1d3129;
+  --ok:#67c295; --guess:#d6ac57; --none:#847e70;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--ink); margin:0;
+  font:15px/1.6 "Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:940px; margin:0 auto; padding:48px 24px 80px}
+header.top{margin-bottom:32px}
+h1{font-size:28px; letter-spacing:-.02em; margin:0 0 6px}
+.sub{color:var(--ink-2); margin:0}
+.privacy{
+  display:inline-block; margin-top:14px; padding:5px 11px; border-radius:999px;
+  background:var(--accent-soft); color:var(--accent); font-size:13px; font-weight:600;
+}
+
+#boot{color:var(--ink-3); padding:40px 0}
+
+#drop{
+  border:2px dashed var(--line); border-radius:14px; background:var(--panel);
+  padding:56px 28px; text-align:center; transition:border-color .15s, background .15s;
+}
+#drop.over{border-color:var(--accent); background:var(--accent-soft)}
+#drop p{color:var(--ink-2); margin:0 0 20px}
+.btn{
+  display:inline-block; background:var(--accent); color:#fff; border:0; cursor:pointer;
+  padding:11px 20px; border-radius:9px; font-size:15px; font-weight:600; font-family:inherit;
+}
+.btn:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+.hint{color:var(--ink-3); font-size:13px; margin-top:18px}
+#error{
+  margin-top:18px; padding:12px 14px; border-radius:9px;
+  background:#fdecec; color:#a3272b; font-size:14px;
+  white-space:pre-line; text-align:left;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) #error{background:#3a1d1e; color:#f0a8a8} }
+
+#progress{padding:40px 0}
+.track{height:8px; background:var(--line); border-radius:99px; overflow:hidden}
+#bar{height:100%; width:0; background:var(--accent); transition:width .1s linear}
+#ptext{color:var(--ink-3); font-size:13px; margin-top:10px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+
+#stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:14px}
+.stat{background:var(--panel); border:1px solid var(--line); border-radius:11px; padding:14px 16px}
+.stat b{display:block; font-size:22px; font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+.stat span{color:var(--ink-3); font-size:13px}
+#elapsed{color:var(--ink-3); font-size:13px; margin:0 0 28px}
+#warn{
+  margin:0 0 22px; padding:12px 14px; border-radius:9px; font-size:14px;
+  background:#fff5e0; color:#7a5a10; white-space:pre-line;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) #warn{background:#33280f; color:#e0bd6e} }
+
+#list{display:flex; flex-direction:column; gap:12px}
+.pt{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px}
+.pt header{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:10px}
+.pt h3{font-size:17px; margin:0; letter-spacing:-.01em}
+.span{color:var(--ink-3); font-size:13px; margin-left:auto; font-variant-numeric:tabular-nums}
+.span em{display:block; font-style:normal; text-align:right; opacity:.8; margin-top:2px}
+.badge{font-size:12px; font-weight:600; padding:2px 8px; border-radius:999px; border:1px solid}
+.b-ok{color:var(--ok); border-color:var(--ok)}
+.b-guess{color:var(--guess); border-color:var(--guess)}
+.b-none{color:var(--none); border-color:var(--none)}
+.journey{display:flex; flex-wrap:wrap; align-items:center; gap:5px 7px; font-size:14px}
+.leg{color:var(--ink)}
+.leg i{color:var(--ink-3); font-style:normal; font-size:12px; font-variant-numeric:tabular-nums}
+.arrow{color:var(--ink-3)}
+.missing,.note{color:var(--ink-3); font-size:13px; margin-top:9px}
+
+.pt{cursor:pointer; transition:border-color .12s, transform .12s}
+.pt:hover{border-color:var(--accent)}
+.pt:active{transform:translateY(1px)}
+.pt:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+.pt .go{margin-left:8px; color:var(--ink-3); font-size:13px}
+.pt:hover .go{color:var(--accent)}
+
+#archive{position:fixed; inset:0; display:flex; flex-direction:column; background:var(--bg)}
+#archive[hidden]{display:none}   /* display:flex 가 [hidden] 을 이기므로 명시한다 */
+.abar{display:flex; align-items:center; gap:12px; padding:10px 16px;
+  border-bottom:1px solid var(--line); background:var(--panel); flex:none}
+.abar #aname{color:var(--ink-2); font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.back{background:none; border:1px solid var(--line); color:var(--ink); cursor:pointer;
+  padding:6px 12px; border-radius:8px; font-size:14px; font-family:inherit}
+.back:hover{border-color:var(--accent); color:var(--accent)}
+#aframe{flex:1; width:100%; border:0; background:var(--bg)}
+</style>
+
+
+<div class="wrap">
+
+  <header class="top">
+    <h1>FM 커리어 아카이브</h1>
+    <p class="sub">내보낸 팀 파일로 지난 시즌까지 되살립니다.</p>
+    <span class="privacy">파일은 이 브라우저 안에서만 처리됩니다</span>
+  </header>
+
+  <div id="boot">준비 중…</div>
+
+  <section id="drop" hidden>
+    <div id="pick" hidden>
+      <p>Football Manager 폴더를 여기에 끌어다 놓으세요</p>
+      <button class="btn" id="pickBtn" type="button">폴더 고르기</button>
+      <input type="file" id="folder" webkitdirectory directory multiple hidden>
+      <div class="hint" id="slowNote" hidden>
+        이 브라우저는 폴더를 직접 훑을 수 없어, 폴더를 고르면 시간이 오래 걸릴 수 있습니다.<br>
+        <b>끌어다 놓기</b>를 쓰시거나, <code>exported teams</code> 폴더만 고르세요.
+      </div>
+      <div class="hint">
+        <code>exported teams</code> 의 <code>.fmf</code> 파일과
+        <code>games</code> 의 <code>.fm</code> 세이브를 읽습니다.<br>
+        세이브는 앞 300KB 만 읽습니다 — 400MB 파일이라도 통째로 열지 않습니다.
+      </div>
+      <div id="error" hidden></div>
+    </div>
+
+    <div id="progress" hidden>
+      <div class="track"><div id="bar"></div></div>
+      <div id="ptext"></div>
+    </div>
+  </section>
+
+  <section id="result" hidden>
+    <div id="stats"></div>
+    <p id="elapsed"></p>
+    <div id="warn" hidden></div>
+    <div id="list"></div>
+  </section>
+
+</div>
+
+<!-- 아카이브는 iframe 에 띄운다.
+     render.js 가 만드는 문서는 자기 <style> 과 <script> 를 품고 있어서,
+     innerHTML 로 밀어 넣으면 스크립트가 안 돌고 CSS 가 목록 화면과 부딪힌다. -->
+<div id="archive" hidden>
+  <div class="abar">
+    <button class="back" id="backBtn" type="button">← 세이브 목록</button>
+    <span id="aname"></span>
+  </div>
+  <iframe id="aframe" title="커리어 아카이브"></iframe>
+</div>
+
+<script>!function(f){typeof module!='undefined'&&typeof exports=='object'?module.exports=f():typeof define!='undefined'&&define.amd?define(['fzstd',f]):(typeof self!='undefined'?self:this).fzstd=f()}(function(){var _e={};"use strict";var r=ArrayBuffer,t=Uint8Array,e=Uint16Array,n=Int16Array,a=Uint32Array,s=Int32Array,i=function(r,e,n){if(t.prototype.slice)return t.prototype.slice.call(r,e,n);(null==e||e<0)&&(e=0),(null==n||n>r.length)&&(n=r.length);var a=new t(n-e);return a.set(r.subarray(e,n)),a},o=function(r,e,n,a){if(t.prototype.fill)return t.prototype.fill.call(r,e,n,a);for((null==n||n<0)&&(n=0),(null==a||a>r.length)&&(a=r.length);n<a;++n)r[n]=e;return r},u=function(r,e,n,a){if(t.prototype.copyWithin)return t.prototype.copyWithin.call(r,e,n,a);for((null==n||n<0)&&(n=0),(null==a||a>r.length)&&(a=r.length);n<a;)r[e++]=r[n++]};_e.ZstdErrorCode={InvalidData:0,WindowSizeTooLarge:1,InvalidBlockType:2,FSEAccuracyTooHigh:3,DistanceTooFarBack:4,UnexpectedEOF:5};var h=["invalid zstd data","window size too large (>2046MB)","invalid block type","FSE accuracy too high","match distance too far back","unexpected EOF"],f=function(r,t,e){var n=Error(t||h[r]);if(n.code=r,Error.captureStackTrace&&Error.captureStackTrace(n,f),!e)throw n;return n},l=function(r,t,e){for(var n=0,a=0;n<e;++n)a|=r[t++]<<(n<<3);return a},v=function(r,t){return(r[t]|r[t+1]<<8|r[t+2]<<16|r[t+3]<<24)>>>0},c=function(r,e){var n=r[0]|r[1]<<8|r[2]<<16;if(3126568==n&&253==r[3]){var a=r[4],i=a>>5&1,o=a>>2&1,u=3&a,h=a>>6;8&a&&f(0);var c=6-i,b=3==u?4:u,y=l(r,c,b),p=h?1<<h:i,w=l(r,c+=b,p)+(1==h&&256),g=w;if(!i){var d=1<<10+(r[5]>>3);g=d+(d>>3)*(7&r[5])}g>2145386496&&f(1);var m=new t((1==e?w||g:e?0:g)+12);return m[0]=1,m[4]=4,m[8]=8,{b:c+p,y:0,l:0,d:y,w:e&&1!=e?e:m.subarray(12),e:g,o:new s(m.buffer,0,3),u:w,c:o,m:Math.min(131072,g)}}if(25481893==(n>>4|r[3]<<20))return v(r,4)+8;f(0)},b=function(r){for(var t=0;1<<t<=r;++t);return t-1},y=function(a,s,i){var o=4+(s<<3),u=5+(15&a[s]);u>i&&f(3);for(var h=1<<u,l=h,v=-1,c=-1,y=-1,p=h,w=new r(512+(h<<2)),g=new n(w,0,256),d=new e(w,0,256),m=new e(w,512,h),z=512+(h<<1),E=new t(w,z,h),k=new t(w,z+h);v<255&&l>0;){var A=b(l+1),T=o>>3,x=(1<<A+1)-1,F=(a[T]|a[T+1]<<8|a[T+2]<<16)>>(7&o)&x,S=(1<<A)-1,B=x-l-1,I=F&S;if(I<B?(o+=A,F=I):(o+=A+1,F>S&&(F-=B)),g[++v]=--F,-1==F?(l+=F,E[--p]=v):l-=F,!F)do{var U=o>>3;c=(a[U]|a[U+1]<<8)>>(7&o)&3,o+=2,v+=c}while(3==c)}(v>255||l)&&f(0);for(var D=0,M=(h>>1)+(h>>3)+3,W=h-1,O=0;O<=v;++O){var j=g[O];if(j<1)d[O]=-j;else for(y=0;y<j;++y){E[D]=O;do{D=D+M&W}while(D>=p)}}for(D&&f(0),y=0;y<h;++y){var C=d[E[y]]++,H=k[y]=u-b(C);m[y]=(C<<H)-h}return[o+7>>3,{b:u,s:E,n:k,t:m}]},p=function(r,n){var a=0,s=-1,i=new t(292),u=r[n],h=i.subarray(0,256),l=i.subarray(256,268),v=new e(i.buffer,268);if(u<128){var c=y(r,n+1,6),p=c[1],w=c[0]<<3,g=r[n+=u];g||f(0);for(var d=0,m=0,z=p.b,E=z,k=(++n<<3)-8+b(g);!((k-=z)<w);){var A=k>>3;if(h[++s]=p.s[d+=(r[A]|r[A+1]<<8)>>(7&k)&(1<<z)-1],(k-=E)<w)break;h[++s]=p.s[m+=(r[A=k>>3]|r[A+1]<<8)>>(7&k)&(1<<E)-1],z=p.n[d],d=p.t[d],E=p.n[m],m=p.t[m]}++s>255&&f(0)}else{for(s=u-127;a<s;a+=2){var T=r[++n];h[a]=T>>4,h[a+1]=15&T}++n}var x=0;for(a=0;a<s;++a)(I=h[a])>11&&f(0),x+=I&&1<<I-1;var F=b(x)+1,S=1<<F,B=S-x;for(B&B-1&&f(0),h[s++]=b(B)+1,a=0;a<s;++a){var I;++l[h[a]=(I=h[a])&&F+1-I]}var U=new t(S<<1),D=U.subarray(0,S),M=U.subarray(S);for(v[F]=0,a=F;a>0;--a){var W=v[a];o(M,a,W,v[a-1]=W+l[a]*(1<<F-a))}for(v[0]!=S&&f(0),a=0;a<s;++a){var O=h[a];if(O){var j=v[O];o(D,a,j,v[O]=j+(1<<F-O))}}return[n,{n:M,b:F,s:D}]},w=y(new t([81,16,99,140,49,198,24,99,12,33,196,24,99,102,102,134,70,146,4]),0,6)[1],g=y(new t([33,20,196,24,99,140,33,132,16,66,8,33,132,16,66,8,33,68,68,68,68,68,68,68,68,36,9]),0,6)[1],d=y(new t([32,132,16,66,102,70,68,68,68,68,36,73,2]),0,5)[1],m=function(r,t){for(var e=r.length,n=new s(e),a=0;a<e;++a)n[a]=t,t+=1<<r[a];return n},z=new t(new s([0,0,0,0,16843009,50528770,134678020,202050057,269422093]).buffer,0,36),E=m(z,0),k=new t(new s([0,0,0,0,0,0,0,0,16843009,50528770,117769220,185207048,252579084,16]).buffer,0,53),A=m(k,3),T=function(r,t,e){var n=r.length,a=t.length,s=r[n-1],i=(1<<e.b)-1,o=-e.b;s||f(0);for(var u=0,h=e.b,l=(n<<3)-8+b(s)-h,v=-1;l>o&&v<a;){var c=l>>3;t[++v]=e.s[u=(u<<h|(r[c]|r[c+1]<<8|r[c+2]<<16)>>(7&l))&i],l-=h=e.n[u]}l==o&&v+1==a||f(0)},x=function(r,t,e){var n=6,a=t.length+3>>2,s=a<<1,i=a+s;T(r.subarray(n,n+=r[0]|r[1]<<8),t.subarray(0,a),e),T(r.subarray(n,n+=r[2]|r[3]<<8),t.subarray(a,s),e),T(r.subarray(n,n+=r[4]|r[5]<<8),t.subarray(s,i),e),T(r.subarray(n),t.subarray(i),e)},F=function(r,n,a){var s,u=n.b,h=r[u],l=h>>1&3;n.l=1&h;var v=h>>3|r[u+1]<<5|r[u+2]<<13,c=(u+=3)+v;if(1==l){if(u>=r.length)return;return n.b=u+1,a?(o(a,r[u],n.y,n.y+=v),a):o(new t(v),r[u])}if(!(c>r.length)){if(0==l)return n.b=c,a?(a.set(r.subarray(u,c),n.y),n.y+=v,a):i(r,u,c);if(2==l){var m=r[u],F=3&m,S=m>>2&3,B=m>>4,I=0,U=0;F<2?1&S?B|=r[++u]<<4|(2&S&&r[++u]<<12):B=m>>3:(U=S,S<2?(B|=(63&r[++u])<<4,I=r[u]>>6|r[++u]<<2):2==S?(B|=r[++u]<<4|(3&r[++u])<<12,I=r[u]>>2|r[++u]<<6):(B|=r[++u]<<4|(63&r[++u])<<12,I=r[u]>>6|r[++u]<<2|r[++u]<<10)),++u;var D=a?a.subarray(n.y,n.y+n.m):new t(n.m),M=D.length-B;if(0==F)D.set(r.subarray(u,u+=B),M);else if(1==F)o(D,r[u++],M);else{var W=n.h;if(2==F){var O=p(r,u);I+=u-(u=O[0]),n.h=W=O[1]}else W||f(0);(U?x:T)(r.subarray(u,u+=I),D.subarray(M),W)}var j=r[u++];if(j){255==j?j=32512+(r[u++]|r[u++]<<8):j>127&&(j=j-128<<8|r[u++]);var C=r[u++];3&C&&f(0);for(var H=[g,d,w],L=2;L>-1;--L){var Z=C>>2+(L<<1)&3;if(1==Z){var q=new t([0,0,r[u++]]);H[L]={s:q.subarray(2,3),n:q.subarray(0,1),t:new e(q.buffer,0,1),b:0}}else 2==Z?(u=(s=y(r,u,9-(1&L)))[0],H[L]=s[1]):3==Z&&(n.t||f(0),H[L]=n.t[L])}var G=n.t=H,J=G[0],K=G[1],N=G[2],P=r[c-1];P||f(0);var Q=(c<<3)-8+b(P)-N.b,R=Q>>3,V=0,X=(r[R]|r[R+1]<<8)>>(7&Q)&(1<<N.b)-1,Y=(r[R=(Q-=K.b)>>3]|r[R+1]<<8)>>(7&Q)&(1<<K.b)-1,$=(r[R=(Q-=J.b)>>3]|r[R+1]<<8)>>(7&Q)&(1<<J.b)-1;for(++j;--j;){var _=N.s[X],rr=N.n[X],tr=J.s[$],er=J.n[$],nr=K.s[Y],ar=K.n[Y],sr=1<<nr,ir=sr+((r[R=(Q-=nr)>>3]|r[R+1]<<8|r[R+2]<<16|r[R+3]<<24)>>>(7&Q)&sr-1);R=(Q-=k[tr])>>3;var or=A[tr]+((r[R]|r[R+1]<<8|r[R+2]<<16)>>(7&Q)&(1<<k[tr])-1);R=(Q-=z[_])>>3;var ur=E[_]+((r[R]|r[R+1]<<8|r[R+2]<<16)>>(7&Q)&(1<<z[_])-1);if(R=(Q-=rr)>>3,X=N.t[X]+((r[R]|r[R+1]<<8)>>(7&Q)&(1<<rr)-1),R=(Q-=er)>>3,$=J.t[$]+((r[R]|r[R+1]<<8)>>(7&Q)&(1<<er)-1),R=(Q-=ar)>>3,Y=K.t[Y]+((r[R]|r[R+1]<<8)>>(7&Q)&(1<<ar)-1),ir>3)n.o[2]=n.o[1],n.o[1]=n.o[0],n.o[0]=ir-=3;else{var hr=ir-(0!=ur);hr?(ir=3==hr?n.o[0]-1:n.o[hr],hr>1&&(n.o[2]=n.o[1]),n.o[1]=n.o[0],n.o[0]=ir):ir=n.o[0]}for(L=0;L<ur;++L)D[V+L]=D[M+L];M+=ur;var fr=(V+=ur)-ir;if(fr<0){var lr=-fr,vr=n.e+fr;for(lr>or&&(lr=or),L=0;L<lr;++L)D[V+L]=n.w[vr+L];V+=lr,or-=lr,fr=0}for(L=0;L<or;++L)D[V+L]=D[fr+L];V+=or}if(V!=M)for(;M<D.length;)D[V++]=D[M++];else V=D.length;a?n.y+=V:D=i(D,0,V)}else if(a){if(n.y+=B,M)for(L=0;L<B;++L)D[L]=D[M+L]}else M&&(D=i(D,M));return n.b=c,D}f(2)}},S=function(r,e){if(1==r.length)return r[0];for(var n=new t(e),a=0,s=0;a<r.length;++a){var i=r[a];n.set(i,s),s+=i.length}return n};function B(r,t){for(var e=[],n=+!t,a=0,s=0;r.length;){var i=c(r,n||t);if("object"==typeof i){for(n?(t=null,i.w.length==i.u&&(e.push(t=i.w),s+=i.u)):(e.push(t),i.e=0);!i.l;){var o=F(r,i,t);o||f(5),t?i.e=i.y:(e.push(o),s+=o.length,u(i.w,0,o.length),i.w.set(o,i.w.length-o.length))}a=i.b+4*i.c}else a=i;r=r.subarray(a)}return S(e,s)}_e.decompress=B;var I=function(){function r(r){this.ondata=r,this.c=[],this.l=0,this.z=0}return r.prototype.push=function(r,e){if("number"==typeof this.s){var n=Math.min(r.length,this.s);r=r.subarray(n),this.s-=n}var a=r.length+this.l;if(!this.s){if(e){if(!a)return void this.ondata(new t(0),!0);a<5&&f(5)}else if(a<18)return this.c.push(r),void(this.l=a);if(this.l&&(this.c.push(r),r=S(this.c,a),this.c=[],this.l=0),"number"==typeof(this.s=c(r)))return this.push(r,e)}if("number"!=typeof this.s){if(a<(this.z||3))return e&&f(5),this.c.push(r),void(this.l=a);if(this.l&&(this.c.push(r),r=S(this.c,a),this.c=[],this.l=0),!this.z&&a<(this.z=2&r[this.s.b]?4:3+(r[this.s.b]>>3|r[this.s.b+1]<<5|r[this.s.b+2]<<13)))return e&&f(5),this.c.push(r),void(this.l=a);for(this.z=0;;){var s=F(r,this.s);if(!s){e&&f(5);var i=r.subarray(this.s.b);return this.s.b=0,this.c.push(i),void(this.l+=i.length)}if(this.ondata(s,!1),u(this.s.w,0,s.length),this.s.w.set(s,this.s.w.length-s.length),this.s.l){var o=r.subarray(this.s.b);return this.s=4*this.s.c,void this.push(o,e)}}}else e&&f(5)},r}();_e.Decompress=I;return _e})</script>
+<script>
+window.__REG = {};
+window.__require = function (p) {
+  var k = String(p).replace(/^\.\//, "");
+  if (k === "fs" || k === "path") throw new Error("브라우저에는 " + k + " 가 없다 (CLI 전용 자리)");
+  var m = window.__REG[k];
+  if (!m) throw new Error("모듈을 못 찾음: " + p);
+  return m;
+};
+window.__define = function (name, fn) {
+  var module = { exports: {} };
+  fn(module, module.exports, window.__require);
+  window.__REG[name] = module.exports;
+};</script>
+<script>window.__define("tags.js", function (module, exports, require) {
+"use strict";
+
+const C = { CONFIRMED: "확인", GUESS: "추정" };
+
+const IDENTITY = {
+  Pfna: { label: "이름",        confidence: C.CONFIRMED, note: "(C) 실제 선수명과 대조" },
+  Psna: { label: "성",          confidence: C.CONFIRMED, note: "(C) 실제 선수명과 대조" },
+  Pcna: { label: "한글 이름",    confidence: C.CONFIRMED, note: "한글화 모드가 깔려 있을 때만 채워짐" },
+  Pfln: { label: "전체 이름",    confidence: C.CONFIRMED, note: "(C) 실제 선수명과 대조" },
+  Psnu: { label: "등번호",       confidence: C.CONFIRMED },
+  Phes: { label: "키", unit: "cm", confidence: C.CONFIRMED, note: "(C) 실제 신장과 일치" },
+  Pwes: { label: "몸무게", unit: "kg", confidence: C.CONFIRMED, note: "(C) 실제 체중과 일치" },
+  Pmor: { label: "사기",        confidence: C.GUESS },
+  Pcwg: { label: "주급",        confidence: C.GUESS, note: "값 분포가 임금처럼 보이나 화폐 단위 미확인" },
+  Ppos: { label: "포지션 코드",  confidence: C.GUESS },
+  Peth: { label: "인종",        confidence: C.GUESS },
+  Phcl: { label: "머리 색",      confidence: C.GUESS },
+  Pskt: { label: "피부 톤",      confidence: C.GUESS },
+};
+
+const ABILITY = {
+  PCAB: { label: "현재 능력(CA)", confidence: C.CONFIRMED, note: "1~200. 시즌마다 변하고 PA를 넘지 않음" },
+  PPAB: { label: "잠재 능력(PA)", confidence: C.CONFIRMED, note: "같은 선수는 시즌이 바뀌어도 불변임을 확인" },
+  PCRP: { label: "현재 명성",     confidence: C.CONFIRMED, note: "(E) 캡처본 대조. 박민철 내보내기 9394 ↔ 1년 뒤 화면 9391" },
+  PHRP: { label: "고국에서의 명성", confidence: C.CONFIRMED, note: "(E) 캡처본 대조. 그라타코스 8415 ↔ 화면 8410" },
+  PWRP: { label: "세계 명성",     confidence: C.CONFIRMED, note: "(E) 캡처본 대조. 그라타코스 10000 ↔ 화면 9998. 순서를 바꾸면 오차가 훨씬 커진다" },
+};
+
+const POSITION = {
+  Pgoa: { label: "GK",  confidence: C.CONFIRMED, note: "(A) 골키퍼만 20" },
+  Pdls: { label: "DL",  confidence: C.CONFIRMED },
+  Pdce: { label: "DC",  confidence: C.CONFIRMED, note: "(B) 태클·마크와 강한 양의 상관" },
+  Pdrs: { label: "DR",  confidence: C.CONFIRMED },
+  Pwbl: { label: "WBL", confidence: C.CONFIRMED },
+  Pwbr: { label: "WBR", confidence: C.CONFIRMED },
+  Pdmc: { label: "DM",  confidence: C.CONFIRMED },
+  Pmls: { label: "ML",  confidence: C.CONFIRMED },
+  Pmce: { label: "MC",  confidence: C.CONFIRMED },
+  Pmrs: { label: "MR",  confidence: C.CONFIRMED },
+  Paml: { label: "AML", confidence: C.CONFIRMED },
+  Pamc: { label: "AMC", confidence: C.CONFIRMED },
+  Pamr: { label: "AMR", confidence: C.CONFIRMED },
+  Pace: { label: "ST",  confidence: C.CONFIRMED, note: "(B) 마무리와 가장 강한 상관 +0.57" },
+};
+
+const POSITION_ORDER = [
+  "Pgoa", "Pdls", "Pdce", "Pdrs", "Pwbl", "Pwbr",
+  "Pdmc", "Pmls", "Pmce", "Pmrs", "Paml", "Pamc", "Pamr", "Pace",
+];
+
+const ATTRIBUTE = {
+
+  PDrf: { label: "반사 신경", group: "GK", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (A) 차이 +60.8" },
+  PDae: { label: "공중 장악력", group: "GK", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (A) 차이 +57.4" },
+  PDoo: { label: "1:1 방어", group: "GK", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (A) 차이 +56.7" },
+  PDhn: { label: "볼 핸들링", group: "GK", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (A) 차이 +54.7" },
+  PDca: { label: "페널티 박스 장악력", group: "GK", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (A) 차이 +51.4" },
+  PDkc: { label: "골킥", group: "GK", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (A) 차이 +50.7" },
+  PDcm: { label: "수비 조율", group: "GK", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (A) 차이 +50.3" },
+  PDth: { label: "공 던지기", group: "GK", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (A) 차이 +49.3" },
+  PDro: { label: "돌진(빈도)", group: "GK", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (A) 차이 +43.3" },
+  PDtp: { label: "펀칭(빈도)", group: "GK", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (A) 차이 +41.3" },
+  PDec: { label: "기행", group: "GK", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (A) 차이 +16.3, 평균 10으로 낮음" },
+
+  PDfn: { label: "골 결정력",   group: "기술", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 공격수 +0.57" },
+  PDtk: { label: "태클",        group: "기술", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 수비수 +0.55" },
+  PDmr: { label: "일대일 마크", group: "기술", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 수비수 +0.51" },
+  PDfk: { label: "프리킥",      group: "기술", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 공격형MF +0.49" },
+  PDcs: { label: "코너킥",      group: "기술", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 공격형MF +0.43, 평균 38" },
+  PDls: { label: "중거리 슛",   group: "기술", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 공격형MF +0.41" },
+  PDdr: { label: "드리블",      group: "기술", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 공격수 +0.39" },
+  PDhd: { label: "헤더",        group: "기술", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 수비수 +0.37" },
+  PDps: { label: "패스",        group: "기술", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 중앙·공격형MF와 상관, 평균 60" },
+  PDtc: { label: "개인기",      group: "기술", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 평균 68로 최상위" },
+  PDpn: { label: "페널티킥",    group: "기술", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 공격형MF +0.35, 평균 39" },
+  PDlt: { label: "장거리 스로인", group: "기술", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 측면수비 +0.35, 평균 29" },
+  PDcr: { label: "크로스",      group: "기술", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 측면MF +0.25, 수비수 -0.27" },
+  PDft: { label: "퍼스트 터치", group: "기술", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 평균 62" },
+
+  PDpt: { label: "수비 위치 선정", group: "정신", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 수비수 +0.48. GK 전용 아님" },
+  PDbr: { label: "대담성",      group: "정신", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 수비수 +0.35" },
+  PDcc: { label: "집중력",      group: "정신", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 수비수 +0.34" },
+  PDvs: { label: "시야",        group: "정신", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 공격형MF +0.38" },
+  PDdc: { label: "판단력",      group: "정신", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 평균 63" },
+  PDtm: { label: "팀워크",      group: "정신", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 수비형MF +0.25" },
+  PDcp: { label: "침착성",      group: "정신", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 평균 58" },
+  PDwr: { label: "활동량",      group: "정신", confidence: C.CONFIRMED,     note: "(E) 캡처본 대조 — save/truth.js. (B) 수비형MF +0.22" },
+  PDan: { label: "예측력",      group: "정신", confidence: C.CONFIRMED , note: "(E) 캡처본 대조 — save/truth.js" },
+  PDld: { label: "리더십",      group: "정신", confidence: C.CONFIRMED , note: "(E) 캡처본 대조 — save/truth.js" },
+  PDmv: { label: "오프 더 볼",  group: "정신", confidence: C.CONFIRMED,     note: "(E) 캡처본 대조 — save/truth.js. (B) 공격형MF +0.38, GK에겐 사실상 0" },
+  PDde: { label: "승부욕",     group: "정신", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js. 약칭조차 못 정하던 칸이었다 — determination" },
+  PDfl: { label: "천재성",     group: "정신", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js. flair. 숨은 값인 줄 알았으나 화면에 나온다" },
+  PDag: { label: "적극성",     group: "정신", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js. aggression. 숨은 값인 줄 알았으나 화면에 나온다" },
+
+  PDjm: { label: "점프 거리",   group: "신체", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (A)(B) 수비수 +0.42, GK도 높음" },
+  PDst: { label: "몸싸움",      group: "신체", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (B) 수비수 +0.29" },
+  PDal: { label: "민첩성",      group: "신체", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js · (D) 스피드 0.82·가속력 0.75·밸런스 0.56, 태클 0.11" },
+  PDpc: { label: "주력",        group: "신체", confidence: C.CONFIRMED,     note: "(E) 캡처본 대조 — save/truth.js. (A) 필드 우세. PDac 과 짝으로 보임" },
+  PDac: { label: "가속도",      group: "신체", confidence: C.CONFIRMED,     note: "(E) 캡처본 대조 — save/truth.js. (A) 필드 우세. PDpc 와 짝으로 보임" },
+  PDsm: { label: "지구력",      group: "신체", confidence: C.CONFIRMED , note: "(E) 캡처본 대조 — save/truth.js" },
+  PDbl: { label: "균형 감각",   group: "신체", confidence: C.CONFIRMED , note: "(E) 캡처본 대조 — save/truth.js" },
+  PDnf: { label: "타고난 체력", group: "신체", confidence: C.CONFIRMED,     note: "(E) 캡처본 대조 — save/truth.js. 평균 88로 높음" },
+
+  PDlf: { label: "왼발",       group: "주발", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js (박민철 9). (D) 왼쪽 +0.497 / 오른쪽 -0.223" },
+  PDri: { label: "오른발",     group: "주발", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js (박민철 20). (D) 왼쪽 -0.489 / 오른쪽 +0.260" },
+};
+
+const HIDDEN = {
+  PDcy: { label: "꾸준함",     confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js. consistency" },
+  PDim: { label: "중요 경기",  confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js. important matches" },
+  PDvt: { label: "다재다능",   confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js. versatility. 소화 포지션 수와의 상관은 0.14로 약하다" },
+  PDdt: { label: "더티 플레이", confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js. dirtiness. 좋은 선수일수록 낮다" },
+  PDij: { label: "부상 빈도",  confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — save/truth.js. injury proneness. 좋은 선수일수록 낮다" },
+};
+
+const PERSONALITY = {
+  Pada: { label: "적응력",        confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — 월시 15/15/10/10/18/14/15/3" },
+  Pamb: { label: "포부",          confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — 월시 15/15/10/10/18/14/15/3" },
+  Ploy: { label: "의리",          confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — 월시 15/15/10/10/18/14/15/3" },
+  Ppre: { label: "압박감 대처",   confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — 월시 15/15/10/10/18/14/15/3" },
+  Ppro: { label: "프로 의식",     confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — 월시 15/15/10/10/18/14/15/3" },
+  Pspo: { label: "스포츠맨십",    confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — 월시 15/15/10/10/18/14/15/3" },
+  Ptem: { label: "참을성",        confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — 월시 15/15/10/10/18/14/15/3" },
+  Pcvy: { label: "논쟁성",        confidence: C.CONFIRMED, note: "(E) 캡처본 대조 — 월시 15/15/10/10/18/14/15/3" },
+};
+
+const CONTRACT = {
+  Pcjd: { label: "합류일",    isDate: true, confidence: C.CONFIRMED, note: "(C) 실제 입단일과 일치" },
+  Pcsd: { label: "계약 시작", isDate: true, confidence: C.CONFIRMED },
+  Pcex: { label: "계약 만료", isDate: true, confidence: C.CONFIRMED, note: "(C) 전원 6월 30일로 떨어짐" },
+  Pdob: { label: "생년월일",  isDate: true, confidence: C.CONFIRMED, note: "선수에겐 없다. 감독·스태프만 가짐" },
+};
+
+const CLUB = {
+  TCns: { label: "구단 정식명", confidence: C.CONFIRMED, note: "예: 렉섬 AFC" },
+  TCsn: { label: "구단 약칭",   confidence: C.CONFIRMED, note: "예: 렉섬" },
+  TCnn: { label: "구단 별명",   confidence: C.CONFIRMED, note: "예: The Dragons" },
+  TCoi: { label: "구단 ID",     confidence: C.CONFIRMED, note: "로고 경로 pictures/club/<ID>/logo 와 일치" },
+  TCrp: { label: "구단 명성",   confidence: C.GUESS },
+  Snam: { label: "경기장 이름", confidence: C.CONFIRMED, note: "예: 레이스코스 그라운드" },
+  Scpy: { label: "수용 인원",   confidence: C.CONFIRMED, note: "Sscy(좌석 수)와 값이 일치. 증축·이전이 시즌별로 반영됨" },
+  Sscy: { label: "좌석 수",     confidence: C.GUESS,     note: "Scpy 와 같은 값으로 나옴" },
+  Catd: { label: "Catd",       confidence: C.GUESS,
+          note: "'평균 관중'으로 추정했다가 철회. 수용인원을 넘는 값이 나온다 " +
+                "(어느 구단 수용 47,532 / Catd 53,474). 정체 미상이라 이름을 붙이지 않는다" },
+};
+
+const ALL = Object.assign(
+  {}, IDENTITY, ABILITY, POSITION, ATTRIBUTE, HIDDEN, PERSONALITY, CONTRACT, CLUB
+);
+
+const RANKABLE = {
+  전체: ["PCAB", "PPAB"],
+  기술: ["PDfn", "PDdr", "PDps", "PDtc", "PDcr", "PDhd", "PDtk", "PDmr", "PDls", "PDft", "PDfk"],
+  정신: ["PDvs", "PDdc", "PDcp", "PDcc", "PDtm", "PDpt", "PDbr"],
+  신체: ["PDpc", "PDac", "PDst", "PDjm", "PDal", "PDsm"],
+  골키퍼: ["PDrf", "PDhn", "PDoo", "PDae", "PDca", "PDkc"],
+};
+
+function labelOf(tag) {
+  const e = ALL[tag];
+  if (!e) return tag;
+  return e.confidence === C.GUESS ? e.label + "?" : e.label;
+}
+
+function isConfirmed(tag) {
+  return !!ALL[tag] && ALL[tag].confidence === C.CONFIRMED;
+}
+
+function attributeGroups() {
+  const groups = {};
+  for (const [tag, e] of Object.entries(ATTRIBUTE)) {
+    (groups[e.group] = groups[e.group] || []).push({ tag, ...e });
+  }
+  return groups;
+}
+
+module.exports = {
+  C,
+  IDENTITY, ABILITY, POSITION, POSITION_ORDER,
+  ATTRIBUTE, HIDDEN, PERSONALITY, CONTRACT, CLUB, ALL, RANKABLE,
+  labelOf, isConfirmed, attributeGroups,
+};
+
+});</script>
+<script>window.__define("parse.js", function (module, exports, require) {
+"use strict";
+
+let P = null;
+let ZSTD_MAGIC = null;
+
+function configure(platform) {
+  P = platform;
+  ZSTD_MAGIC = P.fromHex("28b52ffd");
+  module.exports.ZSTD_MAGIC = ZSTD_MAGIC;
+  return module.exports;
+}
+const HEADER_SIZE = 26;
+
+const TYPE_SIZE = {
+  0x00: 0,
+  0x03: 1,
+  0x11: 1,
+  0x12: 2,
+  0x01: 4,
+  0x02: 4,
+  0x0a: 4,
+  0x0b: 4,
+  0x0d: 4,
+  0x0f: 8,
+  0x20: 4,
+
+};
+
+function fourcc(buf, at) {
+  let s = "";
+  for (let i = 3; i >= 0; i--) s += String.fromCharCode(buf[at + i]);
+  return s;
+}
+
+function decodeDate(raw) {
+  if (!raw || raw <= 0) return null;
+  const packed = Math.floor(raw / 256);
+  const year = Math.floor(packed / 512);
+  const dayOfYear = packed - year * 512;
+  if (year < 1850 || year > 2200 || dayOfYear < 1 || dayOfYear > 366) return null;
+  const d = new Date(Date.UTC(year, 0, 1));
+  d.setUTCDate(dayOfYear);
+  return d.toISOString().slice(0, 10);
+}
+
+function walkRecords(buf, onRecord) {
+  let i = 0;
+  const limit = buf.length - 6;
+  while (i < limit) {
+    if (buf[i + 4] !== 0x01) { i++; continue; }
+    const tag = fourcc(buf, i);
+    if (!/^[\x21-\x7e]{4}$/.test(tag)) { i++; continue; }
+
+    const type = buf[i + 5];
+    let value, size;
+
+    if (type === 0x1a) {
+      const n = buf.readUInt32LE(i + 6);
+      if (n > buf.length - i) { i++; continue; }
+      size = 4 + n;
+      value = buf.slice(i + 10, i + 10 + n).toString("utf8");
+    } else if (TYPE_SIZE[type] !== undefined) {
+      size = TYPE_SIZE[type];
+      switch (type) {
+        case 0x00: value = true; break;
+        case 0x03:
+        case 0x11: value = buf[i + 6]; break;
+        case 0x12: value = buf.readUInt16LE(i + 6); break;
+        case 0x0f: value = [buf.readInt32LE(i + 6), buf.readInt32LE(i + 10)]; break;
+        case 0x01:
+        case 0x0b:
+        case 0x20: value = buf.readUInt32LE(i + 6); break;
+        case 0x0d: value = "#" + [buf[i + 6], buf[i + 7], buf[i + 8]]
+                     .map(function (c) { return c.toString(16).padStart(2, "0"); }).join(""); break;
+        default:   value = buf.readInt32LE(i + 6);
+      }
+    } else { i++; continue; }
+
+    onRecord(tag, type, value, i);
+    i += 6 + size;
+  }
+}
+
+function readArchive(data, label) {
+  if (!P) throw new Error("parse.configure(platform) 를 먼저 호출해야 합니다");
+  const kind = fourcc(data, 2);
+  const encrypted = kind === "afe.";
+
+  const at = data.lastIndexOf(ZSTD_MAGIC);
+  if (at < 0) throw new Error("인덱스를 찾을 수 없음: " + (label || ""));
+  const index = P.zstdDecompress(data.slice(at));
+
+  let p = 0;
+  const u32 = () => { const v = index.readUInt32LE(p); p += 4; return v; };
+  const u64 = () => { const v = Number(index.readBigUInt64LE(p)); p += 8; return v; };
+  const str = () => { const n = u32(); const s = index.slice(p, p + n).toString("utf8"); p += n; return s; };
+
+  const root = str();
+  const count = u32();
+  const entries = [];
+  for (let k = 0; k < count; k++) {
+    const name = str(), ext = str();
+    const offset = u64(), stored = u64(), plain = u64();
+    u64(); u64();
+    entries.push({
+      name, ext, offset, stored, plain,
+
+      buffer: encrypted ? null : data.slice(HEADER_SIZE + offset, HEADER_SIZE + offset + stored),
+    });
+  }
+  return { root, encrypted, entries };
+}
+
+const NAME_TAGS = new Set(["Pfna", "Psna", "Pcna", "Pfln"]);
+
+const STAFF_ONLY = new Set(["Pdob", "Ncra", "Npta", "Nhmr", "Nwrr", "Ncrr", "Npad", "NpIM"]);
+const isStaffTag = (t) => t.startsWith("ND") || t.startsWith("PP") || STAFF_ONLY.has(t);
+
+const SQUAD_LABEL = { 0: "1군", 10: "U21", 12: "U18" };
+
+function isPlayerBlock(block) {
+  return block.PCAB !== undefined || block.Pgoa !== undefined;
+}
+function isStaffBlock(block) {
+  return Object.keys(block).some(isStaffTag);
+}
+
+function parsePeople(buffer) {
+
+  const chunks = [];
+  const squadOf = [];
+  let current = {};
+  let squad = null;
+  walkRecords(buffer, (tag, type, value) => {
+    if (tag === "Ttyp") { squad = SQUAD_LABEL[value] || ("팀" + value); return; }
+    if (tag === "Pfna") {
+      chunks.push(current); current = {};
+      squadOf[chunks.length] = squad;
+    }
+    current[tag] = value;
+  });
+  chunks.push(current);
+
+  const names = chunks.map((c) => {
+    const n = {};
+    for (const t of NAME_TAGS) if (c[t] !== undefined) n[t] = c[t];
+    return n;
+  });
+  const attrs = chunks.map((c) => {
+    const a = {};
+    for (const t in c) if (!NAME_TAGS.has(t)) a[t] = c[t];
+    return a;
+  });
+
+  const people = [];
+  for (let i = 1; i < chunks.length; i++) {
+    if (!names[i].Pfna) continue;
+
+    const playerBlock = {};
+    for (const t in (attrs[i - 1] || {})) if (!isStaffTag(t)) playerBlock[t] = attrs[i - 1][t];
+
+    const staffBlock = {};
+    for (const t in (attrs[i] || {})) if (isStaffTag(t)) staffBlock[t] = attrs[i][t];
+
+    const player = isPlayerBlock(playerBlock);
+    const block = player ? playerBlock : staffBlock;
+
+    people.push(Object.assign({}, names[i], block, {
+      _isPlayer: player,
+      _isStaff: !player && Object.keys(staffBlock).length > 0,
+      _hasData: Object.keys(block).length > 0,
+      _squad: squadOf[i] || null,
+    }));
+  }
+  return people;
+}
+
+function readExportedTeam(data, label) {
+  const archive = readArchive(data, label);
+  const entry = archive.entries.find((e) => e.ext === ".tex");
+  if (!entry || !entry.buffer) throw new Error("팀 데이터(.tex)가 없음: " + (label || ""));
+  return { root: archive.root, people: parsePeople(entry.buffer) };
+}
+
+module.exports = {
+  configure, HEADER_SIZE, ZSTD_MAGIC,
+  fourcc, decodeDate, walkRecords,
+  readArchive, parsePeople, readExportedTeam,
+};
+
+});</script>
+<script>window.__define("platform-web.js", function (module, exports, require) {
+"use strict";
+
+const DEC = new TextDecoder("utf-8");
+
+class Bytes extends Uint8Array {
+  get _dv() {
+
+    return new DataView(this.buffer, this.byteOffset, this.byteLength);
+  }
+  readUInt8(o) { return this[o]; }
+  readUInt16LE(o) { return this._dv.getUint16(o, true); }
+  readUInt32LE(o) { return this._dv.getUint32(o, true); }
+  readInt32LE(o) { return this._dv.getInt32(o, true); }
+  readBigUInt64LE(o) { return this._dv.getBigUint64(o, true); }
+  toString(enc) { return DEC.decode(this); }
+
+  indexOf(needle, from) {
+    if (typeof needle === "number") return super.indexOf(needle, from);
+    return search(this, needle, from || 0, 1);
+  }
+  lastIndexOf(needle, from) {
+    if (typeof needle === "number") return super.lastIndexOf(needle, from);
+    return search(this, needle, this.length - needle.length, -1);
+  }
+  equals(other) {
+    if (this.length !== other.length) return false;
+    for (let i = 0; i < this.length; i++) if (this[i] !== other[i]) return false;
+    return true;
+  }
+}
+
+function search(hay, needle, start, step) {
+  const n = needle.length;
+  if (!n) return -1;
+  const last = hay.length - n;
+  for (let i = Math.max(0, Math.min(start, last)); i >= 0 && i <= last; i += step) {
+    let k = 0;
+    while (k < n && hay[i + k] === needle[k]) k++;
+    if (k === n) return i;
+  }
+  return -1;
+}
+
+function makePlatform(fzstd) {
+  return {
+    name: "web",
+    Bytes,
+    from: (b) => (b instanceof Bytes ? b : new Bytes(b)),
+    alloc: (n) => new Bytes(n),
+    concat: (list) => {
+      let n = 0;
+      for (const b of list) n += b.length;
+      const out = new Bytes(n);
+      let p = 0;
+      for (const b of list) { out.set(b, p); p += b.length; }
+      return out;
+    },
+    fromHex: (hex) => {
+      const out = new Bytes(hex.length / 2);
+      for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+      return out;
+    },
+
+    zstdDecompress: (bytes) => {
+      const parts = [];
+      const d = new fzstd.Decompress((chunk) => parts.push(chunk));
+      try { d.push(bytes, false); } catch (e) {   }
+      let n = 0;
+      for (const p of parts) n += p.length;
+      const out = new Bytes(n);
+      let at = 0;
+      for (const p of parts) { out.set(p, at); at += p.length; }
+      return out;
+    },
+  };
+}
+
+if (typeof module !== "undefined") module.exports = { Bytes, makePlatform };
+
+});</script>
+<script>window.__define("core.js", function (module, exports, require) {
+"use strict";
+
+const parse = require("./parse.js");
+const tags = require("./tags.js");
+
+function configure(platform) { parse.configure(platform); return module.exports; }
+
+function splitExportName(filename) {
+  const base = filename.replace(/\.fmf$/i, "");
+
+  let rest = base;
+  let manager = null;
+  const dash = base.indexOf(" - ");
+  if (dash > 0) { manager = base.slice(0, dash).trim(); rest = base.slice(dash + 3); }
+
+  const seasonMatch = rest.match(/(\d{4})-(\d{2})/);
+  const season = seasonMatch ? seasonMatch[0] : null;
+
+  let club = seasonMatch ? rest.slice(0, seasonMatch.index) : rest;
+  club = club.replace(/\s*\(\d+\)\s*$/, "").trim();
+  return { manager, club, season };
+}
+
+const KEEP_ATTRS = Object.keys(tags.ATTRIBUTE).concat(Object.keys(tags.HIDDEN));
+
+function slimPlayer(p) {
+  const out = {
+    name: [p.Pfna, p.Psna].filter(Boolean).join(" ") || null,
+    localName: p.Pcna || null,
+    fullName: p.Pfln || null,
+    number: p.Psnu ?? null,
+    ca: p.PCAB ?? null,
+    pa: p.PPAB ?? null,
+    height: p.Phes ?? null,
+    weight: p.Pwes ?? null,
+    wage: p.Pcwg ?? null,
+    morale: p.Pmor ?? null,
+    joined: parse.decodeDate(p.Pcjd),
+    contractFrom: parse.decodeDate(p.Pcsd),
+    contractTo: parse.decodeDate(p.Pcex),
+    squad: p._squad || null,
+    positions: {},
+    attrs: {},
+
+    intl: null,
+  };
+  { const iv = [p.Piap || 0, p.Pigl || 0, p.Puia || 0, p.Puig || 0];
+    if (iv.some((v) => v > 0)) out.intl = iv; }
+  for (const t of tags.POSITION_ORDER) if (p[t] !== undefined) out.positions[t] = p[t];
+  for (const t of KEEP_ATTRS) if (p[t] !== undefined) out.attrs[t] = p[t];
+
+  const attrValues = Object.values(out.attrs);
+  out.injected = out.ca === 200 && out.pa === 200 && !out.fullName
+    && attrValues.length > 0 && attrValues.every((v) => v >= 95 || v <= 15);
+  return out;
+}
+
+const MIN_COMMON = 15;
+const AGREE = 0.9;
+const DAY = 86400000;
+
+const runStartDate = (season) => {
+  const y = seasonYear(season);
+  return y ? y + "-07-01" : "0000-00-00";
+};
+
+function joinedMap(season, cutoff) {
+  const m = new Map();
+  for (const p of season.players) {
+    const k = p.fullName || p.name;
+    if (k && p.joined && p.joined > cutoff) m.set(k, p.joined);
+  }
+  return m;
+}
+
+function joinedAgreement(a, b, cutoff) {
+  const A = joinedMap(a, cutoff), B = joinedMap(b, cutoff);
+  let same = 0, n = 0;
+  for (const [k, v] of A) if (B.has(k)) { n++; if (v === B.get(k)) same++; }
+  return n < MIN_COMMON ? null : same / n;
+}
+
+function detectRuns(entries) {
+  const sorted = entries.filter((e) => e.mtime && e.season).sort((a, b) => a.mtime - b.mtime);
+  const runs = [];
+  let cur = null;
+  for (const e of sorted) {
+    let fresh = !cur || e.season <= cur.lastSeason;
+
+    if (fresh && cur && cur.lastEntry && e.club === cur.lastClub) {
+      const agr = joinedAgreement(cur.lastEntry.data, e.data, runStartDate(cur.firstSeason));
+      if (agr !== null && agr >= AGREE) { fresh = false; e.reexport = true; }
+    }
+    if (fresh) { cur = { entries: [], firstSeason: e.season, lastSeason: null, lastClub: null, lastEntry: null }; runs.push(cur); }
+    cur.entries.push(e);
+    if (!e.reexport) { cur.lastSeason = e.season; cur.lastClub = e.club; cur.lastEntry = e; }
+  }
+  return runs;
+}
+
+function groupByClub(entries) {
+  const by = new Map();
+  for (const e of entries) {
+    if (!by.has(e.club)) by.set(e.club, { entries: [], lastSeason: null, lastClub: e.club, lastEntry: null });
+    by.get(e.club).entries.push(e);
+  }
+  for (const r of by.values()) r.entries.sort((a, b) => String(a.season).localeCompare(String(b.season)));
+  return [...by.values()];
+}
+
+function verifyRun(run) {
+  let ok = 0, bad = 0, skip = 0;
+
+  const cutoff = runStartDate(run.entries.length ? run.entries[0].season : null);
+  for (let i = 1; i < run.entries.length; i++) {
+    const a = run.entries[i - 1], b = run.entries[i];
+    if (a.club !== b.club) { skip++; continue; }
+    const agr = joinedAgreement(a.data, b.data, cutoff);
+    if (agr === null) skip++;
+    else if (agr >= AGREE) ok++;
+    else bad++;
+  }
+  return { ok, bad, skip };
+}
+
+function labelRuns(runs, saveFiles) {
+  for (const run of runs) {
+    const last = run.entries[run.entries.length - 1];
+    const cands = saveFiles
+      .filter((s) => s.club && s.club === last.club && s.modifiedMs >= last.mtime.getTime())
+      .sort((a, b) => a.modifiedMs - b.modifiedMs);
+    if (!cands.length) { run.save = null; continue; }
+
+    const near = cands.filter((s) => s.modifiedMs <= cands[0].modifiedMs + 7 * DAY);
+    run.save = near[near.length - 1];
+  }
+
+  const claimed = new Map();
+  for (const run of runs) {
+    if (!run.save) continue;
+    const end = run.entries[run.entries.length - 1].mtime.getTime();
+    const prev = claimed.get(run.save.name);
+    if (!prev || end > prev.end) { if (prev) prev.run.save = null; claimed.set(run.save.name, { run, end }); }
+    else run.save = null;
+  }
+}
+
+const seasonYear = (s) => (s ? +s.slice(0, 4) : null);
+const seasonOf = (y) => y + "-" + String((y + 1) % 100).padStart(2, "0");
+
+function toPlaythrough(run, index, timeAxisReliable) {
+  const es = run.entries;
+  const journey = [];
+  for (const e of es) {
+    const tail = journey[journey.length - 1];
+
+    if (tail && tail.club === e.club) { tail.to = e.season; tail.seasons.push(e.season); }
+    else journey.push({ club: e.club, from: e.season, to: e.season, seasons: [e.season] });
+  }
+
+  const have = new Set(es.map((e) => e.season));
+  const missing = [];
+  for (let y = seasonYear(es[0].season); y <= seasonYear(es[es.length - 1].season); y++)
+    if (!have.has(seasonOf(y))) missing.push(seasonOf(y));
+
+  const v = verifyRun(run);
+  const mainClub = journey.slice().sort((a, b) => b.seasons.length - a.seasons.length)[0].club;
+  const start = es[0].mtime;
+  const fallbackName = mainClub + " · " + start.getFullYear() + "년 " + (start.getMonth() + 1) + "월";
+
+  return {
+    id: "pt" + (index + 1),
+    name: !timeAxisReliable ? mainClub : (run.save ? run.save.name : fallbackName),
+    named: !!run.save && timeAxisReliable,
+    saveFile: run.save ? run.save.file : null,
+    confidence: !timeAxisReliable ? "추정"
+      : v.bad > 0 ? "추정"
+      : run.save ? "확인" : "세이브 없음",
+    note: !timeAxisReliable ? "파일 수정시각이 남아 있지 않아 세이브를 구분하지 못했습니다. 구단별로만 묶었습니다"
+      : v.bad > 0 ? "합류일 검산에서 " + v.bad + "개 구간이 어긋납니다"
+      : run.save ? null : "대응하는 .fm 세이브 파일이 없습니다",
+    verify: v,
+    span: { from: es[0].season, to: es[es.length - 1].season },
+    exported: { from: es[0].mtime.toISOString().slice(0, 10), to: es[es.length - 1].mtime.toISOString().slice(0, 10) },
+    seasonCount: es.length,
+    missing,
+    journey: journey.map((j) => ({ club: j.club, from: j.from, to: j.to, seasons: j.seasons })),
+    files: es.map((e) => e.file),
+  };
+}
+
+function readSeason(bytes, filename, mtime) {
+  const meta = splitExportName(filename);
+  const { people } = parse.readExportedTeam(bytes, filename);
+
+  const players = people.filter((p) => p._isPlayer).map(slimPlayer);
+  const staff = people.filter((p) => p._isStaff)
+    .map((p) => ({ name: [p.Pfna, p.Psna].filter(Boolean).join(" "), born: parse.decodeDate(p.Pdob) }));
+
+  return {
+    file: filename,
+    season: meta.season,
+    exportedAt: mtime ? new Date(mtime).toISOString().slice(0, 10) : null,
+    club: readClubMeta(bytes, filename),
+    players, staff,
+    summary: squadSummary(players),
+  };
+}
+
+const SAVE_ATTR_ORDER = [
+  "PDcr", "PDdr", "PDfn", "PDhd", "PDls", "PDmr", "PDmv", "PDps", "PDpn", "PDtk",
+  "PDvs", "PDhn", "PDae", "PDca", "PDcm", "PDkc", "PDth", "PDan", "PDdc", "PDoo",
+  "PDpt", "PDrf", "PDft", "PDtc", "PDlf", "PDri", "PDfl", "PDcs", "PDtm", "PDwr",
+  "PDlt", "PDec", "PDro", "PDtp", "PDac", "PDfk", "PDst", "PDsm", "PDpc", "PDjm",
+  "PDld", "PDdt", "PDbl", "PDbr", "PDcy", "PDag", "PDal", "PDim", "PDij", "PDvt",
+  "PDnf", "PDde", "PDcp", "PDcc",
+];
+
+function saveSquadPlayer(p) {
+  return {
+    name: p.name || null, localName: null, fullName: null,
+    number: p.number ?? null, squad: p.squad ?? null, ca: p.ca ?? null, pa: p.pa ?? null,
+    height: p.height ?? null, weight: p.weight ?? null, wage: p.wage ?? null, morale: null,
+    joined: p.joined ?? null, contractFrom: p.contractFrom ?? null, contractTo: p.contractTo ?? null,
+    positions: p.positions && typeof p.positions === "object" && !Array.isArray(p.positions)
+      ? p.positions : {},
+
+    attrs: Array.isArray(p.attrs) && p.attrs.length === SAVE_ATTR_ORDER.length
+      ? Object.fromEntries(SAVE_ATTR_ORDER.map((t, i) => [t, p.attrs[i]]))
+      : {},
+
+    careerApp: p.lgApp ?? null, careerGoal: p.lgGoal ?? null,
+    careerAppAll: p.acApp ?? null, careerGoalAll: p.acGoal ?? null,
+
+    attrHist: p.attrHist ?? null,
+    fromSave: true,
+    person: p.person, dob: p.dob, age: p.age,
+  };
+}
+
+function stat(list) {
+  const cas = list.filter((p) => p.ca != null).map((p) => p.ca);
+  return {
+    squad: list.length,
+    avgCA: cas.length ? +(cas.reduce((a, b) => a + b, 0) / cas.length).toFixed(1) : null,
+    maxCA: cas.length ? Math.max(...cas) : null,
+  };
+}
+
+function squadSummary(players) {
+  const senior = players.filter((p) => p.squad === "1군");
+  return Object.assign(stat(senior.length ? senior : players), {
+    total: stat(players),
+    first: stat(senior),
+    u21: stat(players.filter((p) => p.squad === "U21")),
+    u18: stat(players.filter((p) => p.squad === "U18")),
+    injected: players.filter((p) => p.injected).length,
+  });
+}
+
+function readClubMeta(bytes, label) {
+  const archive = parse.readArchive(bytes, label);
+  const entry = archive.entries.find((e) => e.ext === ".tex");
+  if (!entry || !entry.buffer) return {};
+  const want = new Set(Object.keys(tags.CLUB));
+  const got = {};
+  parse.walkRecords(entry.buffer, (tag, type, value) => {
+    if (want.has(tag) && got[tag] === undefined) got[tag] = value;
+  });
+  return {
+    fullName: got.TCns || null,
+    shortName: got.TCsn || null,
+    nickname: got.TCnn || null,
+    clubId: got.TCoi ?? null,
+    reputation: got.TCrp ?? null,
+    stadium: got.Snam || null,
+    capacity: got.Scpy ?? null,
+    attendance: got.Catd ?? null,
+  };
+}
+
+const OK_STRING = /^[가-힣ぁ-んァ-ヶ一-龥A-Za-z0-9 .,''()\/&\-]{2,}$/;
+
+function saveHeaderInfo(head, knownManagers, P) {
+  const starts = [];
+  let i = 0;
+  while ((i = head.indexOf(parse.ZSTD_MAGIC, i)) >= 0 && starts.length < 12) { starts.push(i); i++; }
+
+  const chunks = [];
+  for (let k = 0; k < starts.length; k++) {
+    try { chunks.push(P.zstdDecompress(head.slice(starts[k], starts[k + 1] || head.length))); }
+    catch (e) {   }
+  }
+  const all = P.concat(chunks);
+
+  const ss = [];
+  for (let p = 0; p + 4 < all.length; p++) {
+    const n = all.readUInt32LE(p);
+    if (n < 2 || n > 120 || p + 4 + n > all.length) continue;
+    const s = all.slice(p + 4, p + 4 + n).toString("utf8");
+    if (OK_STRING.test(s) && s.indexOf("\uFFFD") < 0) { ss.push(s); p += 3 + n; }
+  }
+
+  const out = { version: ss.find((s) => /^\d+\.\d+\.\d+$/.test(s)) || null,
+                manager: null, club: null, nation: null };
+
+  let at = -1;
+  for (const m of knownManagers) { at = ss.indexOf(m); if (at >= 0) { out.manager = m; break; } }
+  if (at >= 0 && ss[at + 1]) {
+    out.club = ss[at + 1].split(" / ")[0].trim();
+    out.nation = (ss[at + 1].split(" / ")[1] || "").trim() || null;
+  }
+  return out;
+}
+
+function assemble({ entries, saves: rawSaves, backup, saveSquads, saveHistory, options, folder, skipped }) {
+  options = options || {};
+  skipped = skipped || [];
+  const clubs = {};
+  const managers = new Set();
+
+  for (const e of entries) {
+    if (e.manager) managers.add(e.manager);
+    if (options.club && !e.club.includes(options.club)) continue;
+    const club = (clubs[e.club] = clubs[e.club] || {
+      name: e.club, manager: e.manager, meta: null, seasons: [],
+    });
+    club.seasons.push(e.data);
+  }
+
+  if (backup) {
+    for (const [clubName, snapshots] of Object.entries(backup.clubs || {})) {
+      if (options.club && !clubName.includes(options.club)) continue;
+      if (clubs[clubName]) continue;
+      const club = (clubs[clubName] = {
+        name: clubName, manager: null, meta: null, seasons: [], fromBackup: true,
+      });
+      for (const snap of snapshots) {
+        const meta = splitExportName(snap.file);
+        club.manager = club.manager || meta.manager;
+        const players = snap.people.filter((p) => p._isPlayer).map(slimPlayer);
+
+        players.forEach((p) => { p.squad = (p.number >= 1 && p.number <= 40) ? "1군" : null; });
+        const senior = players.filter((p) => p.squad === "1군");
+
+        club.seasons.push({
+          file: snap.file, season: meta.season, exportedAt: null,
+          club: null,
+          squadApprox: true,
+          players,
+
+          staff: snap.people.filter((p) => !p._isPlayer && p._hasData)
+            .map((p) => ({ name: [p.Pfna, p.Psna].filter(Boolean).join(" "), born: parse.decodeDate(p.Pdob) })),
+          summary: Object.assign(stat(senior.length ? senior : players), {
+            total: stat(players),
+            first: stat(senior),
+            u21: stat([]), u18: stat([]),
+            injected: players.filter((p) => p.injected).length,
+          }),
+        });
+      }
+    }
+  }
+
+  for (const h of saveHistory || []) {
+    const club = clubs[h.archiveClub];
+    const label = "save-history/" + h.archiveClub;
+    if (!club) { skipped.push({ file: label, reason: "아카이브에 없는 구단이다" }); continue; }
+    if (club.history) { skipped.push({ file: label, reason: "이 구단은 이미 연표가 있다" }); continue; }
+    club.history = { savedAt: h.savedAt || null, clubNumber: h.club, seasons: h.seasons || [] };
+  }
+
+  for (const sq of saveSquads || []) {
+    if (options.club && !String(sq.archiveClub).includes(options.club)) continue;
+    const club = clubs[sq.archiveClub];
+    const label = "save-squads/" + sq.archiveClub + "_" + sq.season;
+    if (!club) { skipped.push({ file: label, reason: "아카이브에 없는 구단이다" }); continue; }
+
+    if (club.seasons.some((s) => s.season === sq.season)) {
+      skipped.push({ file: label, reason: "내보내기로 이미 있는 시즌이라 넣지 않았다" }); continue;
+    }
+    const players = (sq.squad || []).map(saveSquadPlayer);
+    club.seasons.push({
+      file: label, season: sq.season, exportedAt: null, club: null,
+      fromSave: true, savedAt: sq.savedAt,
+      players, staff: [],
+      summary: Object.assign(stat(players), {
+        total: stat(players),
+
+        first: stat([]), u21: stat([]), u18: stat([]),
+        injected: 0,
+      }),
+    });
+  }
+
+  for (const club of Object.values(clubs)) {
+    club.seasons.sort((a, b) => String(a.season).localeCompare(String(b.season)));
+
+    for (let i = club.seasons.length - 1; i >= 0; i--) {
+      if (club.seasons[i].club && club.seasons[i].club.fullName) { club.meta = club.seasons[i].club; break; }
+    }
+    if (!club.meta) club.meta = {};
+
+    const seen = {};
+    for (const s of club.seasons) { seen[s.season] = (seen[s.season] || 0) + 1; }
+    club.duplicateSeasons = Object.entries(seen).filter(([, n]) => n > 1).map(([s]) => s);
+  }
+
+  const bestByName = new Map();
+  for (const s of rawSaves || []) {
+    const prev = bestByName.get(s.name);
+    if (!prev || s.modifiedMs > prev.modifiedMs) bestByName.set(s.name, s);
+  }
+  const saves = [...bestByName.values()].sort((a, b) => b.modifiedMs - a.modifiedMs);
+
+  const saveClubs = new Set(saves.map((s) => s.club).filter(Boolean));
+  for (const club of Object.values(clubs)) club.saveExists = saveClubs.has(club.name);
+
+  const exportDays = new Set(entries.map((e) => new Date(e.mtime).toISOString().slice(0, 10)));
+  const timeAxisReliable = entries.length < 4 || exportDays.size >= 3;
+
+  const runs = timeAxisReliable ? detectRuns(entries) : groupByClub(entries);
+  labelRuns(runs, saves);
+  if (!timeAxisReliable) for (const r of runs) r.save = null;
+  const playthroughs = runs.map((r, i) => toPlaythrough(r, i, timeAxisReliable));
+
+  for (const club of Object.values(clubs)) {
+    if (!club.fromBackup || !club.seasons.length) continue;
+    const ss = club.seasons.map((x) => x.season).filter(Boolean).sort();
+    playthroughs.push({
+      id: "pt" + (playthroughs.length + 1),
+      name: club.name, named: false, saveFile: null,
+      confidence: "추정",
+      note: "원본 내보내기 파일이 없어 백업에서 되살린 기록입니다",
+      verify: { ok: 0, bad: 0, skip: 0 },
+      span: { from: ss[0], to: ss[ss.length - 1] },
+      exported: null, seasonCount: club.seasons.length, missing: [],
+      journey: [{ club: club.name, from: ss[0], to: ss[ss.length - 1], seasons: ss }],
+      files: club.seasons.map((x) => x.file),
+    });
+  }
+
+  for (const club of Object.values(clubs)) {
+    const mine = club.seasons.filter((x) => x.fromSave);
+    if (!mine.length) continue;
+    const cands = playthroughs.filter((p) => p.journey.some((j) => j.club === club.name));
+    for (const s2 of mine) {
+
+      const near = (p) => Math.min(Math.abs(+String(p.span.to).slice(0, 4) - +String(s2.season).slice(0, 4)),
+                                   Math.abs(+String(p.span.from).slice(0, 4) - +String(s2.season).slice(0, 4)));
+      let pt = null;
+      for (const p of cands) if (!pt || near(p) < near(pt)) pt = p;
+      if (!pt) { skipped.push({ file: s2.file, reason: "붙일 런을 찾지 못했다" }); continue; }
+      pt.files.push(s2.file);
+      pt.seasonCount = pt.files.length;
+      if (String(s2.season) > String(pt.span.to)) pt.span.to = s2.season;
+      if (String(s2.season) < String(pt.span.from)) pt.span.from = s2.season;
+      const j = pt.journey.find((x) => x.club === club.name);
+      if (j) {
+        if (String(s2.season) > String(j.to)) j.to = s2.season;
+        if (String(s2.season) < String(j.from)) j.from = s2.season;
+        if (j.seasons && j.seasons.indexOf(s2.season) < 0) { j.seasons.push(s2.season); j.seasons.sort(); }
+      }
+
+      if (Array.isArray(pt.missing)) pt.missing = pt.missing.filter((m) => m !== s2.season);
+    }
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    folder: folder || null,
+    managers: [...managers],
+    clubs: Object.values(clubs).sort((a, b) => b.seasons.length - a.seasons.length),
+    playthroughs,
+    timeAxisReliable,
+    saves,
+    skipped,
+  };
+}
+
+module.exports = {
+  configure, assemble,
+  splitExportName, slimPlayer, readSeason, readClubMeta, saveHeaderInfo,
+  stat, squadSummary,
+
+  SAVE_ATTR_ORDER,
+
+  detectRuns, groupByClub, labelRuns, joinedAgreement, toPlaythrough,
+};
+
+});</script>
+<script>window.__define("render.js", function (module, exports, require) {
+"use strict";
+
+const tags = require("./tags.js");
+
+const POS_GROUPS = [
+  { key: "GK", label: "골키퍼",   tags: ["Pgoa"] },
+  { key: "DF", label: "수비수",   tags: ["Pdls", "Pdce", "Pdrs", "Pwbl", "Pwbr"] },
+  { key: "MF", label: "미드필더", tags: ["Pdmc", "Pmls", "Pmce", "Pmrs"] },
+  { key: "FW", label: "공격수",   tags: ["Paml", "Pamc", "Pamr", "Pace"] },
+];
+
+function primaryGroup(player) {
+  let best = null, bestVal = 0;
+  for (const g of POS_GROUPS) {
+    for (const t of g.tags) {
+      const v = player.positions[t] || 0;
+      if (v > bestVal) { bestVal = v; best = g.key; }
+    }
+  }
+  return bestVal >= 12 ? best : "—";
+}
+
+function positionLabels(player) {
+  return tags.POSITION_ORDER
+    .filter((t) => (player.positions[t] || 0) >= 15)
+    .map((t) => tags.POSITION[t].label);
+}
+
+const displayName = (p) => p.localName || p.name || p.fullName || "이름 없음";
+
+const nameKey = (p) => p.fullName || p.name || "";
+
+const recency = (p) => (p.exported ? p.exported.to : "");
+
+function pickPlaythrough(data, target) {
+  const list = data.playthroughs || [];
+  if (!list.length) throw new Error("세이브 목록이 없습니다. build.js 를 다시 실행해 주세요.");
+  if (!target) {
+
+    return list.slice().sort((a, b) => recency(b).localeCompare(recency(a))
+      || b.seasonCount - a.seasonCount)[0];
+  }
+  return list.find((p) => p.id === target || p.name === target)
+    || list.find((p) => p.name.indexOf(target) >= 0)
+    || list.find((p) => p.journey.some((j) => j.club.indexOf(target) >= 0))
+    || (() => { throw new Error("세이브를 찾지 못했습니다: " + target); })();
+}
+
+function buildPayload(data, target) {
+  const pt = pickPlaythrough(data, target);
+
+  const byFile = new Map();
+  for (const c of data.clubs) for (const s of c.seasons) byFile.set(s.file, { club: c, s: s });
+  const seasons = pt.files.map((f) => byFile.get(f)).filter(Boolean)
+    .filter((x) => x.s.season)
+    .sort((a, b) => String(a.s.season).localeCompare(String(b.s.season)))
+    .map((x) => Object.assign({}, x.s, { clubName: x.club.name, clubRef: x.club }));
+  if (!seasons.length) throw new Error("이 세이브에 시즌 자료가 없습니다: " + pt.name);
+
+  const startYear = (s) => parseInt(s.season.slice(0, 4), 10);
+  const timeline = seasons.map((s, i) => ({
+    season: s.season,
+    club: s.clubName,
+    gapBefore: i > 0 ? startYear(s) - startYear(seasons[i - 1]) - 1 : 0,
+    clubChange: i > 0 && s.clubName !== seasons[i - 1].clubName,
+  }));
+
+  const tenure = new Map();
+  seasons.forEach((s, i) => {
+    if (s.fromSave) return;
+    for (const p of s.players) {
+      const k = nameKey(p);
+      if (!k.trim() || k === "|") continue;
+      let t = tenure.get(k);
+      if (!t) {
+        t = { key: k, name: displayName(p), group: primaryGroup(p), first: i, last: i,
+              seasons: [], joined: p.joined, peakCA: 0, clubs: [] };
+        tenure.set(k, t);
+      }
+      t.last = i;
+      t.seasons.push({ i, ca: p.ca });
+      if (t.clubs.indexOf(s.clubName) < 0) t.clubs.push(s.clubName);
+      if (p.ca > t.peakCA) { t.peakCA = p.ca; t.group = primaryGroup(p); }
+    }
+  });
+
+  const flow = [];
+  for (let i = 1; i < seasons.length; i++) {
+
+    const nameWeak = !!(seasons[i].fromSave || seasons[i - 1].fromSave);
+    const prev = new Set(seasons[i - 1].players.map(nameKey));
+    const cur = new Set(seasons[i].players.map(nameKey));
+    const inNames = seasons[i].players.filter((p) => !prev.has(nameKey(p)));
+    const outNames = seasons[i - 1].players.filter((p) => !cur.has(nameKey(p)));
+    flow.push({
+      season: seasons[i].season,
+      gap: timeline[i].gapBefore > 0,
+      clubChange: timeline[i].clubChange,
+      club: seasons[i].clubName,
+      fromClub: seasons[i - 1].clubName,
+      nameWeak,
+      in: nameWeak ? 0 : inNames.length, out: nameWeak ? 0 : outNames.length,
+      inTop: nameWeak ? [] : inNames.sort((a, b) => b.ca - a.ca).slice(0, 4).map((p) => displayName(p) + " " + p.ca),
+      outTop: nameWeak ? [] : outNames.sort((a, b) => b.ca - a.ca).slice(0, 4).map((p) => displayName(p) + " " + p.ca),
+    });
+  }
+
+  const journey = [];
+  for (const s of seasons) {
+    const meta = s.club || {};
+    const last = journey[journey.length - 1];
+    if (last && last.club === s.clubName && last.name === (meta.stadium || null)
+        && last.capacity === (meta.capacity ?? null)) { last.to = s.season; continue; }
+    journey.push({ club: s.clubName, name: meta.stadium || null,
+                   capacity: meta.capacity ?? null, from: s.season, to: s.season });
+  }
+
+  const slim = seasons.map((s) => ({
+    season: s.season,
+    club: s.clubName,
+    exportedAt: s.exportedAt,
+    summary: s.summary,
+    squadApprox: !!s.squadApprox,
+    fromSave: !!s.fromSave,
+    savedAt: s.savedAt || null,
+    stadium: s.club ? s.club.stadium : null,
+    staff: s.staff,
+
+    players: s.players.map((p, i) => ({
+      key: nameKey(p),
+      uid: i,
+      name: displayName(p),
+      alt: p.name && p.localName && p.name !== p.localName ? p.name : null,
+      full: p.fullName,
+      no: p.number, ca: p.ca, pa: p.pa,
+      h: p.height, w: p.weight, wage: p.wage,
+      joined: p.joined, until: p.contractTo,
+      sq: p.squad,
+      grp: primaryGroup(p),
+      pos: positionLabels(p),
+      positions: p.positions,
+      attrs: p.attrs,
+      cApp: p.careerApp, cGoal: p.careerGoal, cAppAll: p.careerAppAll, cGoalAll: p.careerGoalAll,
+      hist: p.attrHist,
+    })),
+  }));
+
+  let meta = {};
+  for (let i = seasons.length - 1; i >= 0; i--) {
+    if (seasons[i].club && seasons[i].club.fullName) { meta = seasons[i].club; break; }
+  }
+  const lastClub = seasons[seasons.length - 1].clubName;
+
+  return {
+    save: {
+      id: pt.id,
+      name: pt.name,
+      named: pt.named,
+      confidence: pt.confidence,
+      note: pt.note,
+      manager: (seasons[0].clubRef && seasons[0].clubRef.manager) || null,
+      lastClub,
+      clubCount: pt.journey.length,
+      missing: pt.missing,
+      exported: pt.exported,
+      meta,
+      fromBackup: !!(seasons[0].clubRef && seasons[0].clubRef.fromBackup),
+    },
+    timeline,
+    journey,
+    seasons: slim,
+    flow,
+    tenure: [...tenure.values()].sort((a, b) => (b.last - b.first) - (a.last - a.first) || b.peakCA - a.peakCA),
+
+    playthroughs: (data.playthroughs || []).slice()
+      .sort((a, b) => recency(b).localeCompare(recency(a)) || b.seasonCount - a.seasonCount)
+      .map((p) => ({
+        id: p.id, name: p.name, named: p.named, confidence: p.confidence,
+        seasons: p.seasonCount, from: p.span.from, to: p.span.to,
+        clubs: p.journey.map((j) => j.club),
+        exportedTo: p.exported ? p.exported.to : null,
+        current: p.id === pt.id,
+      })),
+    saves: data.saves.map((s) => ({ name: s.name, club: s.club, modified: s.modified, sizeMB: s.sizeMB, version: s.version })),
+    dict: {
+      positions: tags.POSITION_ORDER.map((t) => ({ tag: t, label: tags.POSITION[t].label })),
+      attrs: Object.entries(Object.assign({}, tags.ATTRIBUTE, tags.HIDDEN)).map(([tag, e]) => ({
+        tag, label: e.label, group: e.group || "숨은 값", sure: e.confidence === tags.C.CONFIRMED,
+      })),
+      rankable: tags.RANKABLE,
+    },
+    generatedAt: data.generatedAt,
+  };
+}
+
+const STYLE = `
+:root{
+  color-scheme: light;
+  --ground:#f4f5f7; --surface:#fdfdfe; --surface-2:#eef0f4; --sunken:#e7eaef;
+  --ink:#0f1114; --ink-2:#454b55; --ink-3:#767d89;
+  --line:#dde1e8; --line-strong:#c3cad4;
+  --accent:#2a78d6; --accent-soft:#e3edfb;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --good:#0ca30c; --crit:#d03b3b;
+  --shadow:0 1px 2px rgba(15,17,20,.06), 0 8px 24px -16px rgba(15,17,20,.25);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --ground:#0f1113; --surface:#191c1f; --surface-2:#22262a; --sunken:#141719;
+    --ink:#eef1f4; --ink-2:#b3bac4; --ink-3:#7c848f;
+    --line:#2b3035; --line-strong:#3b424a;
+    --accent:#3987e5; --accent-soft:#17263a;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --good:#0ca30c; --crit:#d03b3b;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --ground:#0f1113; --surface:#191c1f; --surface-2:#22262a; --sunken:#141719;
+  --ink:#eef1f4; --ink-2:#b3bac4; --ink-3:#7c848f;
+  --line:#2b3035; --line-strong:#3b424a;
+  --accent:#3987e5; --accent-soft:#17263a;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -16px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Archivo","Segoe UI",system-ui,sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
+.num{font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px; margin:0 auto; padding:0 24px 96px}
+
+/* 머리말 */
+.masthead{border-bottom:1px solid var(--line); background:var(--surface); margin-bottom:32px}
+.masthead .wrap{padding-top:36px; padding-bottom:28px}
+.eyebrow{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin:0 0 10px}
+h1{font-size:clamp(30px,4.4vw,46px); line-height:1.05; letter-spacing:-.022em;
+  font-weight:700; margin:0 0 6px; text-wrap:balance}
+.sub{color:var(--ink-2); margin:0; font-size:15px}
+.facts{display:flex; flex-wrap:wrap; gap:8px 28px; margin-top:20px;
+  font-size:13px; color:var(--ink-2)}
+.facts b{font-weight:600; color:var(--ink)}
+.themeBtn{position:absolute; top:22px; right:24px; border:1px solid var(--line);
+  background:var(--surface); color:var(--ink-2); border-radius:999px;
+  padding:5px 13px; font-size:12px; cursor:pointer; font-family:inherit}
+.themeBtn:hover{border-color:var(--line-strong); color:var(--ink)}
+
+/* 구획 */
+section{margin:0 0 44px}
+.shead{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin:0 0 4px}
+h2{font-size:20px; letter-spacing:-.012em; font-weight:650; margin:0}
+.snote{color:var(--ink-3); font-size:13px; margin:0 0 16px; max-width:70ch}
+.tier{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--accent); border:1px solid var(--accent);
+  border-radius:3px; padding:1px 6px}
+
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:10px;
+  padding:20px; box-shadow:var(--shadow)}
+.scroller{overflow-x:auto}
+
+/* 통계 타일 */
+.tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px;
+  background:var(--line); border:1px solid var(--line); border-radius:10px; overflow:hidden}
+.tile{background:var(--surface); padding:16px 18px}
+.tile .k{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:6px}
+.tile .v{font-size:26px; font-weight:650; letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums; line-height:1.1}
+.tile .d{font-size:12px; color:var(--ink-2); margin-top:3px}
+
+/* 연대기 */
+.chron{display:flex; flex-direction:column; gap:1px; background:var(--line);
+  border:1px solid var(--line); border-radius:10px; overflow:hidden}
+.crow{display:grid; grid-template-columns:minmax(150px,auto) 1fr 112px minmax(120px,150px); gap:16px;
+  align-items:center; background:var(--surface); padding:10px 16px; font-size:13.5px}
+.crow .cclub{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.crow.now{background:var(--accent-soft)}
+.crow .cname{font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.crow .cclub{color:var(--ink-2); font-size:12.5px}
+.bar{height:7px; border-radius:4px; background:var(--s1); min-width:4px}
+.muted{color:var(--ink-3)}
+
+/* 차트 */
+svg{display:block; max-width:100%}
+.axis text{font-family:"IBM Plex Mono",monospace; font-size:10px; fill:var(--ink-3)}
+.grid line{stroke:var(--line); stroke-width:1}
+.baseline{stroke:var(--line-strong); stroke-width:1}
+.legend{display:flex; gap:18px; flex-wrap:wrap; font-size:12.5px; color:var(--ink-2);
+  margin-bottom:12px}
+.legend i{width:11px; height:11px; border-radius:3px; display:inline-block;
+  margin-right:6px; vertical-align:-1px}
+
+/* 툴팁 */
+.tip{position:absolute; top:8px; pointer-events:none; z-index:5;
+  background:var(--surface); border:1px solid var(--line-strong); border-radius:8px;
+  padding:8px 11px; box-shadow:var(--shadow); font-size:12px; min-width:150px;
+  display:flex; flex-direction:column; gap:2px}
+.tip b{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3);
+  letter-spacing:.06em; margin-bottom:3px}
+.tip span{display:flex; justify-content:space-between; gap:14px; color:var(--ink-2)}
+.tip em{font-style:normal; font-weight:650; color:var(--ink);
+  font-variant-numeric:tabular-nums}
+.tip .tipsub{display:block; color:var(--ink-3); font-size:11px; margin-top:3px;
+  border-top:1px solid var(--line); padding-top:4px}
+
+/* 홈구장의 역사 */
+.stadiums{display:flex; flex-direction:column; gap:1px; background:var(--line)}
+.stad.moved{box-shadow:inset 3px 0 0 var(--s1)}
+.stad{display:grid; grid-template-columns:132px 1fr 88px; gap:14px; align-items:center;
+  background:var(--surface); padding:9px 2px; font-size:13.5px}
+.stad .snum{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-3)}
+.stad .sname{font-weight:560}
+.stad .scap{text-align:right; color:var(--ink-2); font-size:12.5px}
+.stad.last .sname{color:var(--accent); font-weight:640}
+
+/* 간트 */
+.gantt{display:grid; grid-template-columns:170px 1fr 52px; gap:6px 12px; align-items:center;
+  font-size:12.5px}
+.gantt .gname{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer}
+.gantt .gname:hover{color:var(--accent); text-decoration:underline}
+.track{position:relative; height:16px; background:var(--sunken); border-radius:4px}
+.span{position:absolute; top:0; bottom:0; border-radius:4px; opacity:.9}
+.gantt .gyr{text-align:right; color:var(--ink-3); font-family:"IBM Plex Mono",monospace;
+  font-size:11px}
+.gscale{display:grid; grid-template-columns:170px 1fr 52px; gap:12px; margin-bottom:8px;
+  font-family:"IBM Plex Mono",monospace; font-size:10px; color:var(--ink-3)}
+.gscale .ticks{display:flex; justify-content:space-between}
+
+/* 이적 */
+.flowrow{display:grid; grid-template-columns:74px 1fr; gap:14px; align-items:start;
+  padding:9px 0; border-bottom:1px solid var(--line)}
+.flowrow:last-child{border-bottom:0}
+.flowbars{display:flex; flex-direction:column; gap:4px}
+.fb{display:flex; align-items:center; gap:8px; font-size:12px}
+.fb .fbar{height:9px; border-radius:3px; min-width:3px}
+.flowrow.moved{background:var(--surface-2); box-shadow:inset 3px 0 0 var(--line-strong)}
+.flowrow.moved .fbar{opacity:.45}
+.movenote{grid-column:1/-1; color:var(--ink-3); font-size:11.5px; margin-top:4px}
+.fb .flist{color:var(--ink-3); font-size:11.5px; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap}
+
+/* 탐색 층 */
+.tabs{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px}
+.tab{border:1px solid var(--line); background:var(--surface); color:var(--ink-2);
+  border-radius:999px; padding:5px 13px; font-size:12.5px; cursor:pointer;
+  font-family:"IBM Plex Mono",monospace}
+.tab[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
+.tab:hover:not([aria-pressed="true"]){border-color:var(--line-strong); color:var(--ink)}
+
+table{border-collapse:collapse; width:100%; font-size:12.5px}
+th,td{text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); white-space:nowrap}
+th{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:500}
+td.n{text-align:right; font-variant-numeric:tabular-nums;
+  font-family:"IBM Plex Mono",monospace}
+.cell{display:inline-block; min-width:26px; text-align:center; border-radius:3px;
+  padding:2px 0; font-family:"IBM Plex Mono",monospace; font-size:11px}
+
+/* TOP3 */
+.podium{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px}
+.pcard{background:var(--surface); border:1px solid var(--line); border-radius:10px;
+  padding:14px 16px; cursor:pointer; text-align:left; font:inherit; color:inherit; width:100%}
+.pcard:hover{border-color:var(--accent)}
+.pcard .rank{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3)}
+.pcard .pn{font-size:16px; font-weight:640; margin:3px 0 2px; letter-spacing:-.01em}
+.pcard .pm{font-size:12px; color:var(--ink-2)}
+.pcard .pv{font-size:30px; font-weight:680; letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums; margin-top:8px; color:var(--accent)}
+
+/* 선수 카드 */
+dialog{border:1px solid var(--line); border-radius:12px; background:var(--surface);
+  color:var(--ink); padding:0; max-width:620px; width:calc(100% - 32px); box-shadow:var(--shadow)}
+dialog::backdrop{background:rgba(8,10,12,.55)}
+.dhead{padding:20px 22px 16px; border-bottom:1px solid var(--line)}
+.dbody{padding:18px 22px 22px; max-height:62vh; overflow-y:auto}
+.dclose{position:absolute; top:14px; right:16px; border:0; background:transparent;
+  color:var(--ink-3); font-size:22px; cursor:pointer; line-height:1; padding:4px}
+.dclose:hover{color:var(--ink)}
+.kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(108px,1fr)); gap:10px 16px;
+  margin-top:12px; font-size:12.5px}
+.kv .k{color:var(--ink-3); font-family:"IBM Plex Mono",monospace; font-size:10.5px;
+  letter-spacing:.08em; text-transform:uppercase}
+.kv .v{font-variant-numeric:tabular-nums; font-weight:600}
+.agroup{margin-top:18px}
+.agroup h4{font-size:12px; margin:0 0 8px; color:var(--ink-2); font-weight:600}
+.attrs{display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:2px 14px}
+.attr{display:flex; justify-content:space-between; gap:8px; font-size:12.5px;
+  padding:2px 0; border-bottom:1px dotted var(--line)}
+.attr .an{color:var(--ink-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.attr .av{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums;
+  font-weight:600}
+.unsure{color:var(--ink-3)}
+
+footer{border-top:1px solid var(--line); margin-top:56px; padding-top:20px;
+  font-size:12px; color:var(--ink-3); max-width:76ch}
+footer code{font-family:"IBM Plex Mono",monospace; background:var(--surface-2);
+  padding:1px 5px; border-radius:3px}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+@media (max-width:640px){
+  .crow{grid-template-columns:1fr; gap:4px}
+  .gantt,.gscale{grid-template-columns:118px 1fr 44px}
+}
+`;
+
+const APP = String.raw`
+var D = window.__ARCHIVE__;
+var $ = function(s, r){ return (r||document).querySelector(s); };
+var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
+var esc = function(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); };
+var sc = function(v){ return Math.round(v/5); };            // 1~100 → 화면 1~20
+var byTag = {};
+D.dict.attrs.forEach(function(a){ byTag[a.tag] = a; });
+
+/* ── 테마 토글 ── */
+$(".themeBtn").addEventListener("click", function(){
+  var cur = document.documentElement.getAttribute("data-theme");
+  var dark = cur ? cur === "dark"
+    : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+});
+
+/* ── 성장 곡선 ──
+ * 기본은 1군만. 유스(U21·U18)가 섞이면 평균이 크게 내려가 실제 전력과 달라진다.
+ * (스컨소프 2036-37: 1군만 182 / 전체 129)
+ */
+var growthScope = "first";     // "first" | "total"
+
+// 띠 폭에 안 들어가는 구단 이름을 줄인다. "맨체스터 유나이티드" → "맨체스터…"
+function shorten(s, n){ s = String(s||""); return s.length <= n ? s : s.slice(0, Math.max(1,n-1)) + "…"; }
+
+function growth(){
+  var S = D.seasons, W = 860, L = 44, R = 16, B = 36;
+  // 구단이 둘 이상이면 위에 구단 띠를 얹는다. 그만큼 그림 높이를 늘린다.
+  var BAND = S.some(function(s){ return s.club !== S[0].club; });
+  var T = BAND ? 44 : 16, H = BAND ? 296 : 268;
+  var stat = function(s){ return s.summary[growthScope] || s.summary; };
+  var pts = S.map(function(s,i){ return { i:i, s:s, v:stat(s) }; })
+             .filter(function(p){ return p.v && p.v.avgCA != null; });
+  if (!pts.length){ $("#growth").innerHTML = '<p class="muted">표시할 값이 없습니다.</p>'; return; }
+
+  var xs = function(i){ return L + (S.length < 2 ? 0 : i*(W-L-R)/(S.length-1)); };
+  var vals = [];
+  pts.forEach(function(p){ vals.push(p.v.avgCA, p.v.maxCA); });
+  var lo = Math.floor(Math.min.apply(null, vals)/20)*20;
+  var hi = Math.ceil(Math.max.apply(null, vals)/20)*20;
+  if (hi === lo) hi = lo + 20;
+  var ys = function(v){ return T + (H-T-B) * (1 - (v-lo)/(hi-lo)); };
+
+  var g = "";
+  for (var t = lo; t <= hi; t += 20){
+    g += '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+ys(t)+'" y2="'+ys(t)+'"/>';
+    g += '<text x="'+(L-8)+'" y="'+(ys(t)+3.5)+'" text-anchor="end" class="axl">'+t+'</text>';
+  }
+  var mk = function(key, color){
+    var d = pts.map(function(p,k){ return (k?"L":"M")+xs(p.i).toFixed(1)+" "+ys(p.v[key]).toFixed(1); }).join(" ");
+    var dots = pts.map(function(p){
+      return '<circle cx="'+xs(p.i).toFixed(1)+'" cy="'+ys(p.v[key]).toFixed(1)+'" r="4" fill="'+color+'" stroke="var(--surface)" stroke-width="2"/>';
+    }).join("");
+    return '<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linejoin="round"/>'+dots;
+  };
+  var xlab = S.map(function(s,i){
+    return '<text x="'+xs(i).toFixed(1)+'" y="'+(H-B+18)+'" text-anchor="middle" class="axl">'+s.season.slice(2)+'</text>';
+  }).join("");
+
+  // 구단이 바뀐 지점을 곡선 위 "띠"로 그린다.
+  //   글자를 곡선 위에 얹으면 구단이 11개인 세이브에서 서로 겹쳐 읽을 수가 없다.
+  //   띠는 각 구간이 제 폭을 가지므로 겹칠 수가 없고, 좁으면 이름만 생략하면 된다.
+  var moves = "", band = "";
+  if (BAND) {
+    var half = (W-L-R)/Math.max(1,S.length-1)/2;
+    var segs = [], cur = null;
+    S.forEach(function(s,i){
+      if (cur && cur.club === s.club) { cur.last = i; return; }
+      cur = { club: s.club, first: i, last: i }; segs.push(cur);
+    });
+    segs.forEach(function(g,k){
+      var x0 = Math.max(L, xs(g.first) - half), x1 = Math.min(W-R, xs(g.last) + half);
+      var w = x1 - x0;
+      band += '<rect x="'+x0.toFixed(1)+'" y="0" width="'+w.toFixed(1)+'" height="20" rx="4" '+
+        'fill="'+(k%2 ? "var(--sunken)" : "var(--surface-2)")+'"/>';
+      // 이름이 안 들어가는 좁은 구간은 비워 둔다. 잘린 글자보다 빈 칸이 낫다(툴팁에 나온다).
+      if (w > 46) {
+        band += '<text x="'+((x0+x1)/2).toFixed(1)+'" y="14" text-anchor="middle" class="axl" '+
+          'style="fill:var(--ink-2);font-weight:600">'+esc(shorten(g.club, Math.floor(w/11)))+'</text>';
+      }
+      if (k) moves += '<line x1="'+x0.toFixed(1)+'" x2="'+x0.toFixed(1)+'" y1="'+T+'" y2="'+(H-B)+'" '+
+        'stroke="var(--line-strong)" stroke-width="1" stroke-dasharray="3 3"/>';
+    });
+  }
+  var lastP = pts[pts.length-1];
+  var ann = ""; var _unusedAnn = '<text x="'+(xs(lastP.i)-6)+'" y="'+(ys(lastP.v.avgCA)-12)+'" text-anchor="end" '+
+    'style="font-size:12px;font-weight:650;fill:var(--s1)">평균 '+lastP.v.avgCA+'</text>';
+
+  // 툴팁을 위한 투명 히트존 + 세로 기준선
+  var hit = S.map(function(s,i){
+    var w = (W-L-R)/Math.max(1,S.length-1);
+    return '<rect class="hz" data-i="'+i+'" x="'+(xs(i)-w/2).toFixed(1)+'" y="'+T+'" width="'+w.toFixed(1)+
+      '" height="'+(H-T-B)+'" fill="transparent"/>';
+  }).join("");
+
+  $("#growth").innerHTML =
+    '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="시즌별 평균·최고 능력 추이">'+
+    '<style>.axl{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:var(--ink-3)}</style>'+
+    '<g class="grid" stroke="var(--line)">'+g+'</g>'+
+    '<line id="ghair" x1="0" x2="0" y1="'+T+'" y2="'+(H-B)+'" stroke="var(--line-strong)" stroke-width="1" opacity="0"/>'+
+    band + moves + mk("maxCA","var(--s2)") + mk("avgCA","var(--s1)") + xlab + ann + hit +
+    '</svg>';
+
+  $("#growthDelta").textContent = pts[0].v.avgCA + " → " + lastP.v.avgCA;
+
+  // 호버 툴팁 — tip 은 차트 바깥에 있어 다시 그려도 살아남는다
+  var tip = $("#gtip"), hair = $("#ghair"), host = $("#growth");
+  $$("#growth .hz").forEach(function(r){
+    r.onmouseenter = function(){
+      var i = +r.getAttribute("data-i"), s = S[i], v = stat(s);
+      if (!v || v.avgCA == null) return;
+      hair.setAttribute("x1", xs(i)); hair.setAttribute("x2", xs(i)); hair.setAttribute("opacity","1");
+      tip.innerHTML = '<b>'+s.season+'</b>'+
+        '<span>평균 <em>'+v.avgCA+'</em></span>'+
+        '<span>최고 <em>'+v.maxCA+'</em></span>'+
+        '<span>인원 <em>'+v.squad+'</em>명</span>'+
+        '<span class="tipsub">'+esc(s.club)+(s.stadium ? " · "+esc(s.stadium) : "")+'</span>';
+      tip.hidden = false;
+      var box = host.getBoundingClientRect();
+      tip.style.left = Math.min(box.width-180, Math.max(0, xs(i)/W*box.width - 80)) + "px";
+    };
+  });
+  // onmouseleave 로 대입하면 다시 그려도 리스너가 겹치지 않는다
+  host.onmouseleave = function(){ tip.hidden = true; hair.setAttribute("opacity","0"); };
+}
+
+function growthTabs(){
+  $$("#growthScope .tab").forEach(function(b){
+    b.setAttribute("aria-pressed", b.getAttribute("data-k") === growthScope);
+    b.onclick = function(){ growthScope = b.getAttribute("data-k"); growthTabs(); growth(); };
+  });
+}
+
+/* ── 재직 간트 ── */
+function gantt(){
+  var S = D.seasons, N = S.length;
+  var rows = D.tenure.filter(function(t){ return t.last - t.first >= 1; }).slice(0, 26);
+  var col = { GK:"var(--s1)", DF:"var(--s3)", MF:"var(--s4)", FW:"var(--s2)", "—":"var(--ink-3)" };
+  var html = rows.map(function(t){
+    var left = t.first/N*100, width = (t.last-t.first+1)/N*100;
+    return '<div class="gname" data-key="'+esc(t.key)+'" role="button" tabindex="0">'+esc(t.name)+'</div>'+
+      '<div class="track"><div class="span" style="left:'+left.toFixed(2)+'%;width:'+width.toFixed(2)+'%;background:'+col[t.group]+'" title="'+esc(t.name)+' · '+S[t.first].season+'~'+S[t.last].season+'"></div></div>'+
+      '<div class="gyr">'+(t.last-t.first+1)+'시즌</div>';
+  }).join("");
+  $("#gantt").innerHTML = html;
+  $("#gticks").innerHTML = S.map(function(s){ return "<span>"+s.season.slice(2,5)+"</span>"; }).join("");
+  $$("#gantt .gname").forEach(function(el){
+    var open = function(){ openByKey(el.getAttribute("data-key")); };
+    el.addEventListener("click", open);
+    el.addEventListener("keydown", function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); } });
+  });
+}
+
+/* ── 이적 흐름 ── */
+function flow(){
+  // 구단 이동 줄은 최댓값 계산에서 뺀다. 스쿼드 전체가 바뀐 값이라
+  // 그걸 기준으로 삼으면 진짜 이적이 있었던 해의 막대가 전부 눌려 보인다.
+  var normal = D.flow.filter(function(f){ return !f.clubChange; });
+  var max = Math.max.apply(null, (normal.length ? normal : D.flow)
+    .map(function(f){ return Math.max(f.in, f.out); })) || 1;
+  $("#flow").innerHTML = D.flow.map(function(f){
+    var w = function(n){ return Math.min(100, n/max*100).toFixed(1)+"%"; };
+    return '<div class="flowrow'+(f.clubChange ? " moved" : "")+'">'+
+      '<div class="num" style="font-size:12px;color:var(--ink-2)">'+f.season+
+      (f.clubChange ? '<div class="muted" style="font-size:10.5px">'+esc(f.club)+' 부임</div>'
+        : f.gap ? '<div class="muted" style="font-size:10.5px">공백 후</div>' : '')+'</div>'+
+      '<div class="flowbars">'+
+        '<div class="fb"><span class="num" style="width:26px;color:var(--s1)">+'+f.in+'</span>'+
+          '<span class="fbar" style="width:'+w(f.in)+';background:var(--s1)"></span>'+
+          '<span class="flist">'+esc(f.inTop.join(" · "))+'</span></div>'+
+        '<div class="fb"><span class="num" style="width:26px;color:var(--s2)">-'+f.out+'</span>'+
+          '<span class="fbar" style="width:'+w(f.out)+';background:var(--s2)"></span>'+
+          '<span class="flist">'+esc(f.outTop.join(" · "))+'</span></div>'+
+        (f.clubChange ? '<div class="movenote">'+esc(f.fromClub)+' → '+esc(f.club)+
+          ' · 구단을 옮긴 해라 스쿼드가 통째로 바뀝니다. 이적이 아닙니다.</div>' : '')+
+        (f.nameWeak ? '<div class="movenote">세이브에서 뽑은 시즌이 끼어 있습니다. 그 시즌은 이름이 성(姓)뿐이라 영입·방출을 셀 수 없습니다.</div>' : '')+
+      '</div></div>';
+  }).join("");
+}
+
+/* ── 시즌 탐색 ── */
+var seasonIdx = D.seasons.length - 1;
+var rankKey = "PCAB";
+
+function seasonTabs(){
+  $("#seasonTabs").innerHTML = D.seasons.map(function(s,i){
+    return '<button class="tab" data-i="'+i+'" aria-pressed="'+(i===seasonIdx)+'">'+s.season+'</button>';
+  }).join("");
+  $$("#seasonTabs .tab").forEach(function(b){
+    b.addEventListener("click", function(){ seasonIdx = +b.getAttribute("data-i"); seasonTabs(); depth(); contracts(); podium(); });
+  });
+}
+
+/* ── 포지션 뎁스 히트맵 ── */
+function depth(){
+  var S = D.seasons, P = D.dict.positions;
+  var counts = S.map(function(s){
+    return P.map(function(p){ return s.players.filter(function(pl){ return (pl.positions[p.tag]||0) >= 15; }).length; });
+  });
+  /* ⚠ 색 진하기의 기준(max)은 **내보내기 시즌에서만** 잡는다.
+   *   세이브 시즌은 스쿼드가 유스까지 다 들어 있어 인원이 두 배 넘는다(74명 vs 166명).
+   *   그 값이 max 가 되면 내보내기 열 전체가 옅어져 **없던 변화가 보인다.**
+   *   세이브 열은 기준을 넘으면 가장 진한 칸으로 눌러 담는다. */
+  var exIdx = S.map(function(s,i){ return s.fromSave ? -1 : i; }).filter(function(i){ return i >= 0; });
+  var base = exIdx.length ? exIdx : S.map(function(_,i){ return i; });
+  var max = Math.max.apply(null, base.map(function(i){ return Math.max.apply(null, counts[i]); })) || 1;
+  var hasSave = S.some(function(s){ return s.fromSave; });
+  var ramp = ["#cde2fb","#9ec5f4","#6da7ec","#3987e5","#256abf","#184f95"];
+  var head = "<tr><th>포지션</th>" + S.map(function(s,i){
+    /* 세이브에서 뽑은 열에는 ˢ 를 붙인다. 숨기지 않고 밝힌다(위 주석 참고). */
+    return '<th style="text-align:right'+(i===seasonIdx?';color:var(--accent)':'')+'"'+
+      (s.fromSave?' title="세이브에서 뽑은 시즌 — 유스까지 다 들어 있어 인원이 다르다"':'')+'>'+
+      s.season.slice(2)+(s.fromSave?'<span style="color:var(--ink-3)">ˢ</span>':'')+"</th>"; }).join("") + "</tr>";
+  var body = P.map(function(p, pi){
+    return "<tr><td>"+esc(p.label)+"</td>" + S.map(function(s, si){
+      var n = counts[si][pi];
+      var step = n === 0 ? -1 : Math.min(ramp.length-1, Math.floor(n/max*ramp.length));
+      var bg = step < 0 ? "transparent" : ramp[step];
+      var fg = step >= 3 ? "#fff" : "var(--ink)";
+      return '<td class="n"><span class="cell" style="background:'+bg+';color:'+(step<0?"var(--ink-3)":fg)+'">'+(n||"·")+"</span></td>";
+    }).join("") + "</tr>";
+  }).join("");
+  /* 세이브 열은 인원 자체가 달라서 옆 열과 견줄 수 없다. 표 밑에 그렇다고 적는다. */
+  var note = hasSave ? '<div class="movenote">ˢ 는 세이브에서 뽑은 시즌입니다. '+
+    '내보내기는 등록 선수만 담기지만 세이브는 유스까지 전부 담겨 인원이 두 배 넘습니다. '+
+    '그 열의 숫자는 옆 시즌과 나란히 견줄 수 없습니다.</div>' : '';
+  $("#depth").innerHTML = "<table>"+head+body+"</table>"+note;
+}
+
+/* ── 계약 만료 ── */
+function contracts(){
+  var s = D.seasons[seasonIdx];
+  var byYear = {};
+  s.players.forEach(function(p){ if(!p.until) return; var y = p.until.slice(0,4); byYear[y] = (byYear[y]||0)+1; });
+  var years = Object.keys(byYear).sort();
+  if (!years.length){ $("#contracts").innerHTML = '<p class="muted">계약 정보가 없습니다.</p>'; return; }
+  var max = Math.max.apply(null, years.map(function(y){ return byYear[y]; }));
+  $("#contracts").innerHTML = '<div style="display:flex;flex-direction:column;gap:7px">' +
+    years.map(function(y){
+      var n = byYear[y], cliff = n / s.players.length >= 0.3;
+      return '<div style="display:grid;grid-template-columns:52px 1fr 34px;gap:10px;align-items:center;font-size:12.5px">'+
+        '<span class="num" style="color:var(--ink-2)">'+y+'</span>'+
+        '<span style="height:11px;border-radius:4px;background:'+(cliff?"var(--s2)":"var(--s1)")+';width:'+(n/max*100).toFixed(1)+'%"></span>'+
+        '<span class="num" style="text-align:right'+(cliff?';color:var(--s2);font-weight:600':'')+'">'+n+'</span></div>';
+    }).join("") + "</div>";
+  var worst = years.reduce(function(a,b){ return byYear[b] > byYear[a] ? b : a; });
+  $("#cliffNote").textContent = worst + "년에 " + byYear[worst] + "명이 한꺼번에 끝납니다 (스쿼드 " + s.players.length + "명 중).";
+}
+
+/* ── TOP 3 ── */
+function podium(){
+  var s = D.seasons[seasonIdx];
+  var gkOnly = D.dict.rankable["골키퍼"].indexOf(rankKey) >= 0;
+  var pool = s.players.filter(function(p){
+    var isGK = (p.positions.Pgoa||0) >= 15;
+    return gkOnly ? isGK : !isGK;
+  });
+  var val = function(p){ return rankKey === "PCAB" ? p.ca : rankKey === "PPAB" ? p.pa : (p.attrs[rankKey] || 0); };
+  var top = pool.filter(function(p){ return val(p) > 0; }).sort(function(a,b){ return val(b)-val(a); }).slice(0,3);
+  var raw = rankKey === "PCAB" || rankKey === "PPAB";
+  var meta = byTag[rankKey];
+  $("#podiumLabel").textContent = raw ? (rankKey === "PCAB" ? "현재 능력" : "잠재 능력")
+    : (meta ? meta.label + (meta.sure ? "" : "?") : rankKey);
+  $("#podium").innerHTML = top.map(function(p,i){
+    return '<button class="pcard" data-key="'+esc(p.key)+'" data-uid="'+p.uid+'" data-season="'+seasonIdx+'">'+
+      '<div class="rank">'+(i+1)+'위</div>'+
+      '<div class="pn">'+esc(p.name)+'</div>'+
+      '<div class="pm">'+esc(p.pos.join(" · ") || "—")+' · '+(p.h||"?")+'cm</div>'+
+      '<div class="pv">'+(raw ? val(p) : sc(val(p)))+'</div></button>';
+  }).join("") || '<p class="muted">해당 조건의 선수가 없습니다.</p>';
+  $$("#podium .pcard").forEach(function(b){
+    b.addEventListener("click", function(){
+      openByKey(b.getAttribute("data-key"), +b.getAttribute("data-season"), +b.getAttribute("data-uid")); });
+  });
+}
+
+function rankTabs(){
+  var groups = D.dict.rankable, html = "";
+  Object.keys(groups).forEach(function(g){
+    groups[g].forEach(function(t){
+      var m = byTag[t];
+      var label = t === "PCAB" ? "CA" : t === "PPAB" ? "PA" : (m ? m.label + (m.sure ? "" : "?") : t);
+      html += '<button class="tab" data-k="'+t+'" aria-pressed="'+(t===rankKey)+'">'+esc(label)+'</button>';
+    });
+  });
+  $("#rankTabs").innerHTML = html;
+  $$("#rankTabs .tab").forEach(function(b){
+    b.addEventListener("click", function(){ rankKey = b.getAttribute("data-k"); rankTabs(); podium(); });
+  });
+}
+
+/* ── 선수 카드 ── */
+/* uid 를 주면 **그 선수**를 연다. 안 주면 예전처럼 이름표로 찾는다(재직 기간 쪽은 이름표뿐이다).
+ * 이름표로 찾으면 동명이인 중 첫 사람이 열린다 — 그래서 포디움은 uid 를 준다. */
+function openByKey(key, si, uid){
+  var idx = si == null ? seasonIdx : si;
+  var p = (uid != null && !isNaN(uid)) ? D.seasons[idx].players[uid] : null;
+  if (p && key && p.key !== key) p = null;            // 시즌이 바뀌어 번호가 어긋나면 버린다
+  if (!p) p = D.seasons[idx].players.filter(function(x){ return x.key === key; })[0];
+  if (!p){
+    for (var i = D.seasons.length-1; i >= 0; i--){
+      var f = D.seasons[i].players.filter(function(x){ return x.key === key; })[0];
+      if (f){ p = f; idx = i; break; }
+    }
+  }
+  if (!p) return;
+
+  var hist = [];
+  D.seasons.forEach(function(s,i){
+    var m = s.players.filter(function(x){ return x.key === key; })[0];
+    if (m) hist.push({ i: i, season: s.season, ca: m.ca });
+  });
+
+  var spark = "";
+  if (hist.length > 1){
+    var W = 300, H = 56, lo = Math.min.apply(null, hist.map(function(h){ return h.ca; }));
+    var hi = Math.max.apply(null, hist.map(function(h){ return h.ca; }));
+    var pad = Math.max(4, (hi-lo)*0.15);
+    var xs = function(k){ return 4 + k*(W-8)/(hist.length-1); };
+    var ys = function(v){ return H-6 - (v-(lo-pad))/((hi+pad)-(lo-pad))*(H-14); };
+    var d = hist.map(function(h,k){ return (k?"L":"M")+xs(k).toFixed(1)+" "+ys(h.ca).toFixed(1); }).join(" ");
+    spark = '<div class="agroup"><h4>이 구단에서의 현재 능력 추이 &middot; '+hist[0].season+' ~ '+hist[hist.length-1].season+'</h4>'+
+      '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:'+H+'px" role="img" aria-label="시즌별 능력 추이">'+
+      '<path d="'+d+'" fill="none" stroke="var(--s1)" stroke-width="2" vector-effect="non-scaling-stroke"/>'+
+      hist.map(function(h,k){ return '<circle cx="'+xs(k).toFixed(1)+'" cy="'+ys(h.ca).toFixed(1)+'" r="3" fill="var(--s1)"/>'; }).join("")+
+      '</svg><div class="num" style="font-size:11px;color:var(--ink-3);display:flex;justify-content:space-between">'+
+      '<span>'+hist[0].ca+'</span><span>'+hist[hist.length-1].ca+'</span></div></div>';
+  }
+
+  /* 월별 능력치 곡선 (NOTES 4-26 ⑲).
+   * 세이브에서 뽑은 시즌의 **일부 선수만** 갖고 있다 — 우리가 키운 어린 선수 위주다.
+   * 한 점이 한 달이고, 마지막 점이 그 세이브 시점이다.
+   * ⚠ 골키퍼 11칸은 필드 선수에게 5·10·15 로 박혀 있어 평균에서 뺐다(squad.js 에서 묶음별로 나눠 담는다). */
+  var hspark = "";
+  if (p.hist && p.hist.tech && p.hist.tech.length > 5){
+    var HH = p.hist, n = HH.tech.length, W2 = 260, H2 = 56;
+    var series = [["기술", HH.tech, "var(--s1)"], ["정신", HH.ment, "var(--s2)"], ["신체", HH.phys, "var(--s3)"]];
+    var all = HH.tech.concat(HH.ment, HH.phys);
+    var lo2 = Math.min.apply(null, all), hi2 = Math.max.apply(null, all);
+    if (hi2 - lo2 < 8){ var mid = (hi2+lo2)/2; lo2 = mid-4; hi2 = mid+4; }   // 평평한 선수는 눈금을 벌려 준다
+    var pad2 = (hi2-lo2)*0.15;
+    var X = function(k){ return 4 + k*(W2-8)/(n-1); };
+    var Y = function(v){ return H2-6 - (v-(lo2-pad2))/((hi2+pad2)-(lo2-pad2))*(H2-14); };
+    var to = (function(){ var f = HH.from.split("-"); var d = new Date(Date.UTC(+f[0], +f[1]-1+n-1, 1));
+      return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0"); })();
+    hspark = '<div class="agroup"><h4>능력치가 자란 길 &middot; '+esc(HH.from)+' ~ '+esc(to)+' &middot; '+n+'개월</h4>'+
+      '<svg viewBox="0 0 '+W2+' '+H2+'" preserveAspectRatio="none" style="width:100%;height:'+H2+'px" role="img" aria-label="월별 능력치 추이">'+
+      series.map(function(s){
+        var d = s[1].map(function(v,k){ return (k?"L":"M")+X(k).toFixed(1)+" "+Y(v).toFixed(1); }).join(" ");
+        return '<path d="'+d+'" fill="none" stroke="'+s[2]+'" stroke-width="1.6" vector-effect="non-scaling-stroke"/>';
+      }).join("")+'</svg>'+
+      '<div class="num" style="font-size:11px;color:var(--ink-3);display:flex;gap:10px;flex-wrap:wrap">'+
+      series.map(function(s){ return '<span><span style="color:'+s[2]+'">&#9632;</span> '+s[0]+' '+s[1][0]+' &rarr; '+s[1][n-1]+'</span>'; }).join("")+
+      '</div><div class="snote" style="margin-top:6px">한 점이 한 달입니다. 세이브에서 뽑은 시즌의 일부 선수만 이 기록을 갖고 있습니다.</div></div>';
+  }
+  var groups = {};
+  D.dict.attrs.forEach(function(a){
+    if (p.attrs[a.tag] === undefined) return;
+    (groups[a.group] = groups[a.group] || []).push(a);
+  });
+  var isGK = (p.positions.Pgoa||0) >= 15;
+  var order = isGK ? ["GK","기술","정신","신체","주발","숨은 값"] : ["기술","정신","신체","주발","숨은 값"];
+  var attrHtml = order.filter(function(g){ return groups[g]; }).map(function(g){
+    return '<div class="agroup"><h4>'+esc(g)+'</h4><div class="attrs">'+
+      groups[g].map(function(a){
+        return '<div class="attr"><span class="an'+(a.sure?"":" unsure")+'">'+esc(a.label)+(a.sure?"":"?")+
+          '</span><span class="av">'+sc(p.attrs[a.tag])+'</span></div>';
+      }).join("")+'</div></div>';
+  }).join("");
+
+  $("#dlgBody").innerHTML =
+    '<div class="kv">'+
+      '<div><div class="k">CA / PA</div><div class="v">'+(p.ca != null ? p.ca : "—")+' / '+(p.pa != null ? p.pa : "—")+'</div></div>'+
+      '<div><div class="k">등번호</div><div class="v">'+(p.no != null ? p.no : "—")+'</div></div>'+
+      '<div><div class="k">신체</div><div class="v">'+(p.h||"?")+'cm '+(p.w||"?")+'kg</div></div>'+
+      '<div><div class="k">주급</div><div class="v">'+(p.wage != null ? p.wage.toLocaleString() : "—")+'</div></div>'+
+      '<div><div class="k">합류</div><div class="v">'+(p.joined||"—")+'</div></div>'+
+      '<div><div class="k">계약 만료</div><div class="v">'+(p.until||"—")+'</div></div>'+
+      /* 통산 기록은 **세이브에서 뽑은 시즌에만** 있다 (4-26 ⑯). 내보내기에는 없다.
+       * 없는 것과 0 을 구별해야 해서 null 이면 — 로 둔다. */
+      '<div><div class="k">통산 리그</div><div class="v">'+(p.cApp != null ? p.cApp+"경기 "+p.cGoal+"골" : "—")+'</div></div>'+
+      '<div><div class="k">통산 전대회</div><div class="v">'+(p.cAppAll != null ? p.cAppAll+"경기 "+p.cGoalAll+"골" : "—")+'</div></div>'+
+    '</div>' + spark + hspark + attrHtml;
+  $("#dlgName").textContent = p.name;
+  $("#dlgMeta").textContent = (p.full && p.full !== p.name ? p.full + " · " : "") +
+    (p.pos.join(" · ") || "포지션 정보 없음") + " · " + D.seasons[idx].season;
+  $("#dlg").showModal();
+}
+
+$("#dlgClose").addEventListener("click", function(){ $("#dlg").close(); });
+$("#dlg").addEventListener("click", function(e){ if (e.target === $("#dlg")) $("#dlg").close(); });
+
+growthTabs(); growth(); gantt(); flow(); seasonTabs(); depth(); contracts(); rankTabs(); podium();
+`;
+
+function html(payload) {
+  const c = payload.save, m = c.meta || {};
+  const S = payload.seasons;
+  const first = S[0], last = S[S.length - 1];
+  const gaps = payload.timeline.filter((t) => t.gapBefore > 0);
+  const totalPlayers = payload.tenure.length;
+  const saves = payload.saves;
+
+  const fact = (k, v) => `<span><b>${v}</b> ${k}</span>`;
+
+  const maxSeasons = Math.max.apply(null, payload.playthroughs.map((p) => p.seasons));
+  const chron = payload.playthroughs.map((p) => {
+    const w = Math.max(4, p.seasons / maxSeasons * 100);
+
+    const where = p.clubs.length > 1
+      ? p.clubs[0] + " 외 " + (p.clubs.length - 1) + "곳"
+      : (p.clubs[0] || "—");
+    return `<div class="crow${p.current ? " now" : ""}">
+      <div class="cname">${p.name}${p.named ? "" : ' <span class="muted">· 세이브 없음</span>'}</div>
+      <div><div class="bar" style="width:${w.toFixed(1)}%"></div></div>
+      <div class="cclub num">${p.from || "?"}~${(p.to || "?").slice(2)}</div>
+      <div class="cclub">${where}</div>
+    </div>`;
+  }).join("");
+
+  return `<title>${c.name} 커리어 아카이브</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>${STYLE}</style>
+
+<header class="masthead">
+  <div class="wrap" style="position:relative">
+    <button class="themeBtn" type="button">테마</button>
+    <p class="eyebrow">Football Manager 2024 &middot; 커리어 아카이브</p>
+    <h1>${c.name}</h1>
+    <p class="sub">${c.clubCount > 1
+      ? `${c.clubCount}개 구단 · 마지막은 ${m.fullName || c.lastClub}`
+      : `${m.fullName || c.lastClub}${m.stadium ? " &middot; " + m.stadium : ""}${m.capacity ? ` (${m.capacity.toLocaleString()}석)` : ""}`}</p>
+    <div class="facts">
+      ${fact("시즌", S.length)}
+      ${fact("연도", `${first.season} ~ ${last.season}`)}
+      ${fact("거쳐간 선수", totalPlayers)}
+      ${c.clubCount > 1 ? fact("거쳐간 구단", c.clubCount) : ""}
+      ${fact("감독", c.manager || "—")}
+      ${c.named ? "" : '<span class="muted">세이브 파일 없음</span>'}
+      ${gaps.length ? `<span class="muted">내보내기 공백 ${gaps.length}구간</span>` : ""}
+      ${c.fromBackup ? '<span class="muted">원본 삭제 · 백업에서 복원</span>' : ""}
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section>
+    <div class="shead"><span class="tier">1층 · 서사</span><h2>세이브 연대기</h2></div>
+    <p class="snote">FM24 폴더에서 복원한 세이브 목록. 막대는 내보낸 시즌 수이고, 오른쪽은 그 세이브에서 거쳐간 구단입니다.
+      세이브 파일이 지워져도 내보낸 팀 파일만 있으면 커리어는 복원됩니다 — 이름만 못 붙입니다.</p>
+    <div class="chron">${chron}</div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>성장 곡선</h2><span class="num muted" id="growthDelta"></span></div>
+    <p class="snote">현재 능력(CA)의 평균과 최고값. CA는 활약이 아니라 능력을 나타내는 1~200 값입니다.
+      기본은 <b>1군만</b> 봅니다 — 유스가 섞이면 평균이 크게 내려가 실제 전력과 달라집니다.
+      점에 마우스를 올리면 그 시즌 값이 나옵니다.${payload.seasons.some((s) => s.squadApprox)
+        ? ' <b>이 구단은 스쿼드 구분이 추정입니다</b>(원본 파일이 삭제돼 등번호로 근사).' : ""}${
+
+      payload.seasons.some((s) => s.fromSave)
+        ? ' <b>' + payload.seasons.filter((s) => s.fromSave).map((s) => s.season).join(", ") +
+          ' 는 세이브에서 뽑았습니다.</b> 세이브에서는 1군·유스 구분을 못 읽어 <b>1군 보기에는 나오지 않습니다</b>.' +
+          ' 전체 보기에는 나오지만 모수가 다릅니다 — 내보내기는 등록 스쿼드만, 세이브는 그 구단 소속 전원(유스 포함)입니다.' +
+          ' 그래서 평균이 낮게 나오는 것이지 전력이 떨어진 것이 아닙니다.' : ""}</p>
+    <div class="panel">
+      <div class="tabs" id="growthScope" style="margin-bottom:12px">
+        <button class="tab" data-k="first">1군만</button>
+        <button class="tab" data-k="total">전체 (유스 포함)</button>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--s1)"></i>평균</span>
+        <span><i style="background:var(--s2)"></i>최고</span>
+      </div>
+      <!-- 툴팁은 차트 밖에 둔다. 안에 두면 차트를 다시 그릴 때 같이 지워진다. -->
+      <div style="position:relative">
+        <div class="scroller" id="growth"></div>
+        <div id="gtip" class="tip" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  ${payload.journey.length > 1 ? `<section>
+    <div class="shead"><h2>${c.clubCount > 1 ? "여정" : "홈구장의 역사"}</h2></div>
+    <p class="snote">${c.clubCount > 1
+      ? "이 세이브에서 거쳐간 구단과 그때의 홈구장. 구단이 바뀐 지점은 굵게 표시됩니다."
+      : "경기장 이름과 수용인원은 시즌마다 파일에 기록됩니다. 증축과 이전이 그대로 남습니다."}</p>
+    <div class="panel"><div class="stadiums">${payload.journey.map((s, i) => {
+      const moved = i > 0 && payload.journey[i - 1].club !== s.club;
+      return `<div class="stad${i === payload.journey.length - 1 ? " last" : ""}${moved ? " moved" : ""}">
+        <div class="snum">${s.from === s.to ? s.from : s.from + " ~ " + s.to}</div>
+        <div class="sname">${c.clubCount > 1 ? `<b>${s.club}</b>${s.name ? " &middot; " + s.name : ""}` : (s.name || "—")}</div>
+        <div class="scap num">${s.capacity ? s.capacity.toLocaleString() + "석" : "—"}</div>
+      </div>`;
+    }).join("")}</div></div>
+  </section>` : ""}
+
+  <section>
+    <div class="shead"><h2>재직 기간</h2></div>
+    <p class="snote">두 시즌 이상 머문 선수를 오래 있은 순으로. 색은 주 포지션이고, 이름을 누르면 선수 카드가 열립니다.</p>
+    <div class="panel">
+      <div class="legend">
+        <span><i style="background:var(--s1)"></i>골키퍼</span>
+        <span><i style="background:var(--s3)"></i>수비수</span>
+        <span><i style="background:var(--s4)"></i>미드필더</span>
+        <span><i style="background:var(--s2)"></i>공격수</span>
+      </div>
+      <div class="gscale"><span></span><span class="ticks" id="gticks"></span><span></span></div>
+      <div class="gantt" id="gantt"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>이적 흐름</h2></div>
+    <p class="snote">직전 시즌 스쿼드와 비교한 유입(+)과 유출(−). 이름은 CA 상위 네 명입니다.
+      내보내기를 건너뛴 구간은 여러 해가 한 번에 묶여 보입니다.
+      ${c.clubCount > 1 ? "<b>구단을 옮긴 해</b>는 스쿼드가 통째로 바뀌므로 이적이 아닙니다 — 회색으로 구분했고 막대 기준에서도 뺐습니다." : ""}</p>
+    <div class="panel" id="flow"></div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="tier">2층 · 탐색</span><h2>시즌 들여다보기</h2></div>
+    <p class="snote">시즌을 고르면 아래 세 화면이 함께 바뀝니다.</p>
+    <div class="tabs" id="seasonTabs"></div>
+
+    <div class="shead"><h2>포지션 뎁스</h2></div>
+    <p class="snote">각 포지션 적합도가 15 이상인 인원 수. 진할수록 두텁고, 점(·)은 그 자리를 볼 사람이 없다는 뜻입니다. 선택한 시즌은 열 머리에 강조됩니다.</p>
+    <div class="panel scroller" id="depth" style="margin-bottom:24px"></div>
+
+    <div class="shead"><h2>계약 만료</h2></div>
+    <p class="snote" id="cliffNote"></p>
+    <div class="panel" style="margin-bottom:24px" id="contracts"></div>
+
+    <div class="shead"><h2>TOP 3</h2><span class="muted" style="font-size:13px" id="podiumLabel"></span></div>
+    <p class="snote">기준을 바꿔가며 볼 수 있습니다. 골키퍼 항목은 골키퍼끼리만, 나머지는 필드플레이어끼리만 비교합니다. 물음표가 붙은 항목은 이름을 확정하지 못한 능력치입니다.</p>
+    <div class="tabs" id="rankTabs"></div>
+    <div class="podium" id="podium"></div>
+  </section>
+
+  <footer>
+    <p>이 페이지는 <code>exported teams</code> 폴더의 <code>.fmf</code> 파일을 직접 해석해 만들었습니다.
+    능력치는 게임 내부의 1~100 값을 5로 나눠 1~20으로 표시합니다.
+    태그 이름 중 데이터로 검증한 것만 그대로 쓰고, 확정하지 못한 것은 물음표를 붙였습니다.</p>
+    <p>골·어시스트 같은 시즌 성적은 내보낸 팀 파일에 담기지 않습니다. 그래서 "최고의 선수"는 활약이 아니라 능력 기준입니다.</p>
+    <p class="num">생성 ${new Date(payload.generatedAt).toISOString().slice(0, 10)} &middot; 세이브 ${payload.playthroughs.length}개 &middot; .fm 파일 ${saves.length}개</p>
+  </footer>
+</div>
+
+<dialog id="dlg">
+  <div class="dhead" style="position:relative">
+    <button class="dclose" id="dlgClose" type="button" aria-label="닫기">&times;</button>
+    <div style="font-size:21px;font-weight:660;letter-spacing:-.015em" id="dlgName"></div>
+    <div style="font-size:12.5px;color:var(--ink-2);margin-top:3px" id="dlgMeta"></div>
+  </div>
+  <div class="dbody" id="dlgBody"></div>
+</dialog>
+
+<script>window.__ARCHIVE__=${JSON.stringify(payload)};<\/script>
+<script>${APP}<\/script>`;
+}
+
+if (require.main === module) {
+  const fs = require("fs");
+  const path = require("path");
+  const argv = process.argv.slice(2);
+  const opt = {};
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--save" || argv[i] === "--club") opt.save = argv[++i];
+    else if (argv[i] === "--in") opt.in = argv[++i];
+    else if (argv[i] === "--out") opt.out = argv[++i];
+  }
+  const src = opt.in || path.join(__dirname, "data.json");
+  if (!fs.existsSync(src)) throw new Error("먼저 build.js 를 실행해 주세요: " + src);
+
+  const data = JSON.parse(fs.readFileSync(src, "utf8"));
+  const payload = buildPayload(data, opt.save);
+  const out = opt.out || path.join(__dirname, "archive.html");
+  fs.writeFileSync(out, html(payload));
+
+  console.log("세이브    " + payload.save.name + "  (" + payload.seasons.length + "시즌 · 구단 " + payload.save.clubCount + "개)");
+  console.log("선수      " + payload.tenure.length + "명");
+  console.log("출력      " + out + "  (" + (fs.statSync(out).size / 1048576).toFixed(2) + "MB)");
+}
+
+module.exports = { buildPayload, html };
+
+});</script>
+<script>
+"use strict";
+
+const REG = {};
+const norm = (p) => p.replace(/^\.\//, "");
+
+async function loadModule(file) {
+  const m = window.__REG[norm(file)];
+  if (!m) throw new Error("모듈을 못 찾음: " + file);
+  REG[file] = m;
+  return m;
+}
+
+let core = null, platform = null, render = null;
+let DATA = null;
+
+async function boot() {
+  await loadModule("tags.js");
+  await loadModule("parse.js");
+  const web = await loadModule("platform-web.js");
+  core = await loadModule("core.js");
+  render = await loadModule("render.js");
+  platform = web.makePlatform(window.fzstd);
+  core.configure(platform);
+  return core;
+}
+
+const HEAD_BYTES = 300000;
+
+const LOOKS_LIKE_EXPORT = /\d{4}-\d{2}/;
+
+function classify(files) {
+  const fmf = [], fm = [], loose = [], looseFm = [];
+  for (const f of files) {
+
+    const p = "/" + (f.webkitRelativePath || f.name).replace(/\\/g, "/").toLowerCase();
+    if (p.endsWith(".fmf")) {
+      if (p.indexOf("/exported teams/") >= 0) fmf.push(f);
+      else if (LOOKS_LIKE_EXPORT.test(f.name)) loose.push(f);
+    } else if (p.endsWith(".fm")) {
+      if (p.indexOf("/games/") >= 0) fm.push(f);
+      else looseFm.push(f);
+    }
+  }
+
+  if (!fmf.length) fmf.push.apply(fmf, loose);
+  if (!fm.length) fm.push.apply(fm, looseFm);
+  return { fmf, fm };
+}
+
+async function run(files, onProgress) {
+  const { fmf, fm } = classify(files);
+  if (!fmf.length) {
+
+    const sample = files.slice(0, 3)
+      .map((f) => f.webkitRelativePath || f.name).join(" / ") || "(파일 없음)";
+    throw new Error(
+      "내보낸 팀 파일(.fmf)을 찾지 못했습니다. 파일 " + files.length + "개를 훑었습니다.\n" +
+      "예: " + sample + "\n" +
+      "Football Manager 20xx 폴더나 그 안의 'exported teams' 폴더를 골라 주세요.");
+  }
+
+  const entries = [], skipped = [], managers = new Set();
+  const total = fmf.length + fm.length;
+  let done = 0;
+
+  for (const f of fmf) {
+    const meta = core.splitExportName(f.name);
+    if (meta.manager) managers.add(meta.manager);
+  }
+
+  const AHEAD = 8;
+  const readAhead = (list, slice) => {
+    const q = new Map();
+    const prime = (i) => {
+      if (i < list.length && !q.has(i)) {
+        const f = list[i];
+        q.set(i, (slice ? f.slice(0, slice) : f).arrayBuffer());
+      }
+    };
+    for (let i = 0; i < AHEAD; i++) prime(i);
+    return { take: async (i) => { prime(i + AHEAD); const p = q.get(i); q.delete(i); return p; } };
+  };
+
+  const fmfQueue = readAhead(fmf, 0);
+  for (let i = 0; i < fmf.length; i++) {
+    const f = fmf[i];
+    onProgress(done, total, f.name);
+    const meta = core.splitExportName(f.name);
+    try {
+      const bytes = platform.from(new Uint8Array(await fmfQueue.take(i)));
+      entries.push({
+        file: f.name, club: meta.club, manager: meta.manager, season: meta.season,
+        mtime: new Date(f.lastModified),
+        data: core.readSeason(bytes, f.name, f.lastModified),
+      });
+    } catch (e) {
+      skipped.push({ file: f.name, reason: e.message });
+    }
+    done++;
+  }
+
+  const fmQueue = readAhead(fm, HEAD_BYTES);
+  const saves = [];
+  for (let i = 0; i < fm.length; i++) {
+    const f = fm[i];
+    onProgress(done, total, f.name);
+    const info = {
+      file: f.name,
+      name: f.name.replace(/\.fm$/i, "").replace(/ \(v\d+\)$/, ""),
+      sizeMB: Math.round(f.size / 1048576),
+      modified: new Date(f.lastModified).toISOString().slice(0, 10),
+      modifiedMs: f.lastModified,
+      manager: null, club: null, nation: null, version: null,
+    };
+    try {
+      const head = platform.from(new Uint8Array(await fmQueue.take(i)));
+      Object.assign(info, core.saveHeaderInfo(head, [...managers], platform));
+    } catch (e) { info.error = e.message; }
+    saves.push(info);
+    done++;
+  }
+
+  return core.assemble({ entries, saves, backup: null, options: {}, folder: null, skipped });
+}
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function show(data) {
+  $("drop").hidden = true;
+  $("result").hidden = false;
+
+  const seasons = data.clubs.reduce((n, c) => n + c.seasons.length, 0);
+  const players = data.clubs.reduce((n, c) => n + c.seasons.reduce((m, s) => m + s.players.length, 0), 0);
+  const named = data.playthroughs.filter((p) => p.named).length;
+
+  $("stats").innerHTML = [
+    [data.playthroughs.length + "개", "세이브"],
+    [seasons + "개", "시즌"],
+    [players.toLocaleString() + "건", "선수-시즌"],
+    [named + " / " + data.playthroughs.length, "이름 확인"],
+    [data.saves.length + "개", "읽은 .fm 세이브"],
+  ].map((kv) => '<div class="stat"><b>' + kv[0] + "</b><span>" + kv[1] + "</span></div>").join("");
+
+  const warns = [];
+  if (!data.timeAxisReliable) {
+    warns.push("파일 수정시각이 남아 있지 않아 세이브를 구분하지 못했습니다. 구단별로만 묶었습니다.");
+  }
+  if (!data.saves.length) {
+    warns.push("세이브 파일(.fm)을 읽지 못해 이름표를 붙이지 못했습니다. " +
+      "여정과 시즌은 정확하지만 이름이 '구단 · 시기'로만 나옵니다.\n" +
+      "세이브 이름까지 보시려면 'exported teams' 가 아니라 그 위의 " +
+      "Football Manager 20xx 폴더를 골라 주세요.");
+  }
+  if (warns.length) { $("warn").hidden = false; $("warn").textContent = warns.join("\n\n"); }
+
+  $("list").innerHTML = data.playthroughs
+    .slice().sort((a, b) => {
+      const at = a.exported ? a.exported.to : "", bt = b.exported ? b.exported.to : "";
+      return bt.localeCompare(at) || b.seasonCount - a.seasonCount;
+    })
+    .map((p) => {
+      const journey = p.journey.map((j) =>
+        '<span class="leg">' + esc(j.club) + " <i>" +
+        (j.from === j.to ? j.from : j.from + "~" + j.to) + "</i></span>"
+      ).join('<span class="arrow">›</span>');
+      const cls = p.confidence === "확인" ? "ok" : p.confidence === "추정" ? "guess" : "none";
+      const missing = p.missing.length
+        ? '<div class="missing">내보내지 않은 시즌 ' + p.missing.length + "개 — " +
+          p.missing.join(", ") + "</div>"
+        : "";
+      return '<article class="pt" tabindex="0" data-id="' + p.id + '">' +
+        "<header><h3>" + esc(p.name) + "</h3>" +
+        '<span class="badge b-' + cls + '">' + p.confidence + "</span>" +
+        '<span class="go">아카이브 열기 →</span>' +
+        '<span class="span">' + p.span.from + " ~ " + p.span.to + " · " + p.seasonCount + "시즌" +
+        (p.exported ? '<em>마지막 내보내기 ' + p.exported.to + "</em>" : "") + "</span>" +
+        "</header>" +
+        '<div class="journey">' + journey + "</div>" + missing +
+        (p.note ? '<div class="note">' + esc(p.note) + "</div>" : "") +
+        "</article>";
+    }).join("");
+
+  document.querySelectorAll("#list .pt").forEach(function (el) {
+    const open = function () { openArchive(el.getAttribute("data-id")); };
+    el.addEventListener("click", open);
+    el.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
+    });
+  });
+
+  DATA = data;
+  window.__data = data;
+}
+
+function openArchive(id) {
+  const pt = DATA.playthroughs.filter(function (x) { return x.id === id; })[0];
+  try {
+    const payload = render.buildPayload(DATA, id);
+    document.getElementById("aframe").srcdoc = render.html(payload);
+    document.getElementById("aname").textContent =
+      payload.save.name + " · " + payload.seasons.length + "시즌" +
+      (payload.save.clubCount > 1 ? " · 구단 " + payload.save.clubCount + "개" : "");
+    $("result").hidden = true;
+    $("archive").hidden = false;
+
+    history.pushState({ archive: id }, "", "#" + id);
+  } catch (e) {
+    alert((pt ? pt.name : id) + "\n\n아카이브를 만들지 못했습니다: " + e.message);
+    console.error(e);
+  }
+}
+
+function showList() {
+  $("archive").hidden = true;
+  $("result").hidden = false;
+  document.getElementById("aframe").srcdoc = "";
+}
+
+function closeArchive() {
+  if (history.state && history.state.archive) history.back();
+  else showList();
+}
+
+async function handle(files) {
+  $("pick").hidden = true;
+  $("error").hidden = true;
+  $("progress").hidden = false;
+  const t0 = performance.now();
+  try {
+    const data = await run(files, (n, total, name) => {
+      $("bar").style.width = (n / total * 100).toFixed(1) + "%";
+      const secs = ((performance.now() - t0) / 1000).toFixed(0);
+      $("ptext").textContent = n + " / " + total + "   " + secs + "초   " + name;
+    });
+    $("progress").hidden = true;
+    show(data);
+    $("elapsed").textContent = ((performance.now() - t0) / 1000).toFixed(1) + "초 걸림";
+  } catch (e) {
+    $("progress").hidden = true;
+    $("pick").hidden = false;
+    $("error").hidden = false;
+    $("error").textContent = e.message;
+    console.error(e);
+  }
+}
+
+const WANT_DIR = /^(exported teams|games)$/i;
+const MAYBE_PARENT = /^(sports interactive|football manager.*|documents|내 문서)$/i;
+const WANT_FILE = /\.(fmf|fm)$/i;
+
+function decideDir(name, depth) {
+  if (WANT_DIR.test(name)) return "take";
+  if (depth === 0) return "scan";
+  if (MAYBE_PARENT.test(name)) return "scan";
+  return "skip";
+}
+
+const setPath = (f, p) => {
+
+  try { Object.defineProperty(f, "webkitRelativePath", { value: p }); }
+  catch (e) {   }
+  return f;
+};
+
+async function walkEntry(entry, out, prefix, depth, takeAll, onScan) {
+  if (entry.isFile) {
+    if (!WANT_FILE.test(entry.name)) return;
+    const f = await new Promise((res, rej) => entry.file(res, rej));
+    out.push(setPath(f, prefix + entry.name));
+    onScan(out.length);
+    return;
+  }
+  if (!entry.isDirectory) return;
+  const mode = takeAll ? "take" : decideDir(entry.name, depth);
+  if (mode === "skip") return;
+
+  const reader = entry.createReader();
+  let batch;
+  do {
+    batch = await new Promise((res, rej) => reader.readEntries(res, rej));
+    for (const e of batch) {
+      await walkEntry(e, out, prefix + entry.name + "/", depth + 1, mode === "take", onScan);
+    }
+  } while (batch.length);
+}
+
+async function walkHandle(dir, out, prefix, depth, takeAll, onScan) {
+  const mode = takeAll ? "take" : decideDir(dir.name, depth);
+  if (mode === "skip") return;
+  for await (const [name, h] of dir.entries()) {
+    if (h.kind === "file") {
+      if (!WANT_FILE.test(name)) continue;
+      out.push(setPath(await h.getFile(), prefix + name));
+      onScan(out.length);
+    } else {
+      await walkHandle(h, out, prefix + name + "/", depth + 1, mode === "take", onScan);
+    }
+  }
+}
+
+window.addEventListener("DOMContentLoaded", async () => {
+  try {
+    await boot();
+    $("boot").hidden = true;
+    $("drop").hidden = false;
+    $("pick").hidden = false;
+
+    window.__fm = { run: run, handle: handle, core: function () { return core; },
+                    platform: function () { return platform; },
+                    walkHandle: walkHandle, walkEntry: walkEntry, decideDir: decideDir };
+  } catch (e) {
+    $("boot").textContent = "불러오기 실패: " + e.message;
+    console.error(e);
+    return;
+  }
+
+  const scanning = (n) => {
+    $("pick").hidden = true;
+    $("progress").hidden = false;
+    $("bar").style.width = "0%";
+    $("ptext").textContent = "폴더를 훑는 중… 찾은 파일 " + n + "개";
+  };
+
+  async function collect(fn) {
+    const out = [];
+    scanning(0);
+    try {
+      await fn(out, scanning);
+    } catch (e) {
+      $("progress").hidden = true; $("pick").hidden = false;
+      $("error").hidden = false; $("error").textContent = e.message;
+      console.error(e); return;
+    }
+    handle(out);
+  }
+
+  const canPick = typeof window.showDirectoryPicker === "function";
+  $("pickBtn").addEventListener("click", async () => {
+    if (!canPick) { $("folder").click(); return; }
+    let dir;
+    try { dir = await window.showDirectoryPicker({ mode: "read" }); }
+    catch (e) { return; }
+    collect((out, onScan) => walkHandle(dir, out, "", 0, false, onScan));
+  });
+  $("folder").addEventListener("change", (e) => handle([].slice.call(e.target.files)));
+  $("backBtn").addEventListener("click", closeArchive);
+
+  window.addEventListener("popstate", function () { if (!$("archive").hidden) showList(); });
+  window.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !$("archive").hidden) closeArchive();
+  });
+  if (!canPick) $("slowNote").hidden = false;
+
+  const zone = $("drop");
+  zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("over"); });
+  zone.addEventListener("dragleave", () => zone.classList.remove("over"));
+  zone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    zone.classList.remove("over");
+    const items = [].slice.call(e.dataTransfer.items)
+      .map((i) => (i.webkitGetAsEntry ? i.webkitGetAsEntry() : null)).filter(Boolean);
+    collect(async (out, onScan) => {
+      for (const it of items) await walkEntry(it, out, "", 0, false, onScan);
+    });
+  });
+});
+
+</script>
+
+</body>
+</html>
