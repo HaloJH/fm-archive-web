@@ -4134,7 +4134,7 @@ const BODY = `<div id="app" v-cloak>
             <div><h4>전적</h4><div class="v"><b>{{ t.standing.w }}승 {{ t.standing.d }}무 {{ t.standing.l }}패</b><br><small>{{ t.standing.pts }}점 · 득실 {{ t.standing.gf }}:{{ t.standing.ga }}<template v-if="t.stats"> · 평점 {{ t.stats.avgRating }}</template></small></div></div>
             <div v-if="honOf(t.season).length || lostOf(t.season).length"><h4>트로피</h4><div class="pills">
               <span v-for="h in honOf(t.season)" :key="'w'+h.name" class="pill cup">{{ h.short || h.name }}</span>
-              <span v-for="h in lostOf(t.season)" :key="'l'+h.name" class="pill final">{{ h.short || h.name }} {{ h.kind==='cup' ? '결승' : '준우승' }}</span>
+              <span v-for="h in lostOf(t.season)" :key="'l'+h.name" class="pill final">{{ h.short || h.name }} 준우승</span>
             </div></div>
           </div>
           <div class="trophy-row" v-if="honOf(t.season).length">
@@ -4204,13 +4204,13 @@ const BODY = `<div id="app" v-cloak>
     <div class="tile"><b>{{ s.pts }}</b><span>승점 · {{ s.w }}승 {{ s.d }}무 {{ s.l }}패</span></div>
     <div class="tile"><b>{{ gd>0?'+':'' }}{{ gd }}</b><span>득실 {{ s.gf }}:{{ s.ga }}</span></div>
     <div class="tile" v-if="t.stats"><b>{{ t.stats.avgRating }}</b><span>평균 평점 · xG {{ t.stats.xG }}</span></div>
-    <div class="tile"><b class="g">{{ won.length }}</b><span>트로피<template v-if="lost.length"> · 결승 패 {{ lost.length }}</template></span></div>
+    <div class="tile"><b class="g">{{ won.length }}</b><span>트로피<template v-if="lost.length"> · 준우승 {{ lost.length }}</template></span></div>
     <div class="tile"><b>{{ M(income-spend) }}</b><span>이적 순수입</span></div>
   </div>
   <div class="panels">
     <div class="panel p12" v-if="won.length || lost.length"><h3>진열대 <small>{{ won.length }}개 우승</small></h3><div class="cab">
       <div class="t" v-for="h in won" :key="'w'+h.name"><img v-if="anyPix(h)" :src="anyPix(h)" alt=""><div v-else v-html="trophySvg(h, 44)"></div><em>{{ h.short || h.name }}</em>우승</div>
-      <div class="t lost" v-for="h in lost" :key="'l'+h.name"><div class="g">◇</div><em>{{ h.short || h.name }}</em>{{ h.kind==='cup' ? '결승' : '준우승' }}</div>
+      <div class="t lost" v-for="h in lost" :key="'l'+h.name" style="opacity:.45;filter:grayscale(.55)"><img v-if="anyPix(h)" :src="anyPix(h)" alt=""><div v-else v-html="trophySvg(h, 44)"></div><em>{{ h.short || h.name }}</em>준우승</div>
     </div></div>
     <div class="panel p8"><h3>커리어 속 위치 <small>이 시즌을 표시</small></h3><div v-html="posChart" @mousemove="tipFrom($event)" @mouseleave="tipOff"></div></div>
     <div class="panel p4"><h3>경기력</h3><table><tbody><tr v-for="r in perf" :key="r[0]"><td>{{ r[0] }}</td><td class="n">{{ r[1] }}</td></tr></tbody></table></div>
@@ -4237,7 +4237,7 @@ const BODY = `<div id="app" v-cloak>
 <div>
   <div class="empty" v-if="!rows.length && !loans.length">기록 없음</div>
   <table v-else><tbody>
-    <tr v-for="(x,i) in rows.slice(0,8)" :key="i">
+    <tr v-for="(x,i) in rows" :key="i">
       <td><a v-if="x.name" class="who" :href="'#/player/'+encodeURIComponent(x.name)">{{ x.name }}</a><span v-else class="dim">이름 미상</span><span v-if="x.otherName" class="dim" style="margin-left:6px">{{ x.otherName }}</span></td>
       <td class="n">{{ M(x.fee) }}<template v-if="x.feeMax > x.fee"><br><span class="dim" style="font-size:10px">최대 {{ M(x.feeMax) }}</span></template></td>
     </tr>
@@ -4364,15 +4364,31 @@ const SCRIPT = String.raw`<script>
   var recOf = function (s) { return (D.records || []).filter(function (r) { return r.season === s; })[0] || {}; };
   var troOf = function (s) { return (D.trophies || []).filter(function (t) { return t.season === s; })[0] || { items: [] }; };
   /* 트로피 그림 — 대회 이름 → cupPix 키. 없으면 별 표식 */
-  var PIX = { "잉글랜드 프리미어 리그": "잉글랜드 프리미어 리그", "UEFA Champions League": "UEFA 챔피언스 리그", "잉글랜드 FA 컵": "잉글랜드 FA 컵", "잉글랜드 카라바오 컵": "잉글랜드 카라바오 컵", "UEFA Super Cup": "UEFA 슈퍼컵", "세계 클럽 선수권 대회": "세계 클럽 선수권 대회" };
-  var pix = function (h) { var k = PIX[h.name] || h.name; return (D.cupPix && D.cupPix[k]) || null; };
+  /* 세이브가 준 이름과 사진 열쇠가 늘 같지 않다. 영문으로 오는 대회는 표로, 나라 이름은 붙였다 뗐다 하며 맞춰 본다.
+   * ⚠ **열쇠가 실제로 있을 때만** 쓴다 — 비슷한 걸 골라 붙이면 엉뚱한 트로피가 걸린다. */
+  var PIX = { "UEFA Champions League": "UEFA 챔피언스 리그", "UEFA Super Cup": "UEFA 슈퍼컵",
+    "UEFA Europa League": "UEFA 유로파 리그", "FIFA Club World Cup": "세계 클럽 선수권 대회",
+    "UEFA Europa Conference League": "UEFA 컨퍼런스 리그" };
+  var pix = function (h) {
+    var G = D.cupPix; if (!G) return null;
+    var nm = h.name || "", sh = h.short || "";
+    var tries = [nm, PIX[nm], sh, nm.replace(/^S+s+/, ""), "잉글랜드 " + nm];
+    for (var i = 0; i < tries.length; i++) { var k = tries[i]; if (k && G[k]) return G[k]; }
+    return null;
+  };
   /* 캡처 사진이 없으면 사용자 트로피 팩의 일반 그림으로(웹앱이 graphics 에서 읽어 넣는다). 리그는 접시, 컵은 컵. */
-  var gen = function (h) { var G = D.trophyPix; if (!G) return null; var lg = h.kind === 2 || h.kind === 6; return (lg ? G.league || G.plate : G.cup) || G.cup || G.plate || G.league || null; };
+  var isLeague = function (h) { return h.kind === "league" || h.kind === 2 || h.kind === 6; };
+  var gen = function (h) { var G = D.trophyPix; if (!G) return null; return (isLeague(h) ? G.league || G.plate : G.cup) || G.cup || G.plate || G.league || null; };
   var anyPix = function (h) { return pix(h) || gen(h); };
   /* 그림이 아예 없으면 손으로 그린 트로피. 모양은 대회 종류만 보고 고른다(어느 대회인지는 주장하지 않는다). */
   var SHAPE = { 1: "ears", 2: "plate", 3: "slim", 4: "tall", 5: "shield", 6: "plate", 7: "squat" };
+  /* 모양은 ① 정답지가 짧은 이름으로 알려 준 것 ② 리그면 접시 ③ 그 밖엔 평범한 컵. 어느 대회인지 주장하지 않는다. */
+  function shapeOf(h) {
+    var S = D.shapes || {};
+    return S[h.short] || S[h.name] || SHAPE[h.kind] || (isLeague(h) ? "plate" : "squat");
+  }
   function trophySvg(h, size) {
-    var k = SHAPE[h.kind] || "squat", w = size || 34, gold = h.kind === 1 || h.kind === 2;
+    var k = shapeOf(h), w = size || 34, gold = isLeague(h) || k === "ears";
     var col = gold ? "var(--gold)" : "var(--claret)";
     var body = {
       ears: "<path d='M9 6 H25 V15 C25 22 21 25 17 25 C13 25 9 22 9 15 Z'/><path d='M9 7 C1 7 1 21 8.5 22' fill='none'/><path d='M25 7 C33 7 33 21 25.5 22' fill='none'/><path d='M17 25 V30' fill='none'/><path d='M9 33 H25' stroke-width='2.6' fill='none'/>",
@@ -4396,7 +4412,7 @@ const SCRIPT = String.raw`<script>
     if (won.length) { h = "<em>" + esc(won[0].short || won[0].name) + "</em> 우승" + (won.length > 1 ? ", " + won.length + "관왕" : "");
       if (won.length > 1 && rank(won[0]) === 1) sub.push(won.slice(1).map(function (w) { return esc(w.short || w.name); }).join(" · ") + " 포함"); }
     else if (up) h = "<em>승격</em> — " + esc(TIERNAME[tr]) + "에서 " + esc(TIERNAME[tr - 1]) + "로";
-    else if (lost.length) h = "<em>" + esc(lost[0].short || lost[0].name) + "</em> " + (lost[0].kind === "cup" ? "결승" : "준우승") + "에서 멈추다";
+    else if (lost.length) h = "<em>" + esc(lost[0].short || lost[0].name) + "</em> 준우승";
     else h = s.pos + "위로 마감";
     var f = items.filter(function (x) { return x.r === "우승" && x.foeName && x.foeName.name; })[0];
     if (f) sub.push("결승에서 " + esc(f.foeName.name) + "를 꺾다" + (f.foeName.conf < 0.3 ? "<span class='guess'>상대 추정</span>" : ""));
@@ -8877,7 +8893,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="b2c1a6cb";</script>
+<script>window.__BUILD="8b41548c";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
