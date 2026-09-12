@@ -6850,7 +6850,7 @@ function build(cfg, log) {
     const rows = [...h.entries()].filter(([, e]) => e.win.length || e.lose.length || e.third.length)
       .map(([comp, e]) => ({
         comp: comp,
-        name: NAME.get(comp) ? NAME.get(comp).name : null,
+        name: (NAME.get(comp) ? NAME.get(comp).name : null) || (COMP ? COMP.get(comp) : null) || null,
         short: NAME.get(comp) ? NAME.get(comp).short : null,
         win: e.win, lose: e.lose, third: e.third,
         summer: e.summer,
@@ -7382,6 +7382,26 @@ function build(cfg, log) {
     return "1위 시즌 " + (더함 + 이미) + "회 · 새로 채움 " + 더함 +
            " · 이미 있던 것 " + 이미 + (새대회 ? " · 없던 대회 " + 새대회 + "종" : "") +
            (중도퇴 ? " · 시즌 중 떠나 안 침 " + 중도퇴 : "");
+  }, note);
+
+  part("⑬′ 대회 이름 채우기", () => {
+    const H = out.honours;
+    if (!H) throw new Error("명예표가 없다");
+    if (!COMP || !COMP.size) throw new Error("이름표(COMP)가 없다");
+    let 채움 = 0, 남음 = 0;
+    const 보기 = [];
+    for (const row of H) {
+      if (row.name) continue;
+      const nm = COMP.get(row.comp);
+      if (nm && !/^디비전 /.test(nm)) {
+        row.name = nm; row.short = row.short || nm;
+        (row.fromName = row.fromName || []).push("이름표");
+        채움++;
+        if (보기.length < 4) 보기.push(row.comp + " " + nm);
+      } else 남음++;
+    }
+    return "채운 이름 " + 채움 + "종" + (보기.length ? " — " + 보기.join(" · ") : "") +
+           (남음 ? " · 아직 이름 없는 대회 " + 남음 + "종" : "");
   }, note);
 
   part("⑩ 이적", () => {
@@ -8619,7 +8639,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="f4b29920";</script>
+<script>window.__BUILD="d891faa3";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
