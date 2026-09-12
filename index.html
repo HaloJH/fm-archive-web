@@ -591,7 +591,9 @@ const DEC = new TextDecoder("utf-8");
 class Bytes extends Uint8Array {
   get _dv() {
 
-    return new DataView(this.buffer, this.byteOffset, this.byteLength);
+    const d = new DataView(this.buffer, this.byteOffset, this.byteLength);
+    Object.defineProperty(this, "_dv", { value: d, configurable: true });
+    return d;
   }
   readUInt8(o) { return this[o]; }
   readUInt16LE(o) { return this._dv.getUint16(o, true); }
@@ -9017,7 +9019,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="611af93b";</script>
+<script>window.__BUILD="4436bb9b";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
