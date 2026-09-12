@@ -600,7 +600,17 @@ class Bytes extends Uint8Array {
   readUInt32LE(o) { return this._dv.getUint32(o, true); }
   readInt32LE(o) { return this._dv.getInt32(o, true); }
   readBigUInt64LE(o) { return this._dv.getBigUint64(o, true); }
-  toString(enc) { return DEC.decode(this); }
+
+  writeUInt8(v, o) { this[o | 0] = v; return (o | 0) + 1; }
+  writeUInt16LE(v, o) { this._dv.setUint16(o | 0, v, true); return (o | 0) + 2; }
+  writeUInt32LE(v, o) { this._dv.setUint32(o | 0, v, true); return (o | 0) + 4; }
+
+  toString(enc, start, end) {
+    if (start === undefined && end === undefined) return DEC.decode(this);
+    const a = Math.max(0, Math.min(start | 0, this.length));
+    const b = end === undefined ? this.length : Math.max(a, Math.min(end | 0, this.length));
+    return DEC.decode(this.subarray(a, b));
+  }
 
   indexOf(needle, from) {
     if (typeof needle === "number") return super.indexOf(needle, from);
@@ -621,6 +631,19 @@ function search(hay, needle, start, step) {
   const n = needle.length;
   if (!n) return -1;
   const last = hay.length - n;
+  if (step > 0) {
+    const c0 = needle[0];
+    let i = Math.max(0, Math.min(start, last));
+    while (i >= 0 && i <= last) {
+      i = Uint8Array.prototype.indexOf.call(hay, c0, i);
+      if (i < 0 || i > last) return -1;
+      let k = 1;
+      while (k < n && hay[i + k] === needle[k]) k++;
+      if (k === n) return i;
+      i++;
+    }
+    return -1;
+  }
   for (let i = Math.max(0, Math.min(start, last)); i >= 0 && i <= last; i += step) {
     let k = 0;
     while (k < n && hay[i + k] === needle[k]) k++;
@@ -5503,7 +5526,7 @@ function dictionary(buf, anchorWord) {
   return dictFrom(buf, at - 8);
 }
 
-function dictFrom(buf, head0) {
+function dictFrom(buf, head0, cache) {
   const ok = (p) => {
     if (p < 0 || p + 8 > buf.length) return false;
     const len = buf.readUInt32LE(p + 4);
@@ -5523,6 +5546,7 @@ function dictFrom(buf, head0) {
     if (found < 0) break;
     head = found;
   }
+  if (cache) { const 있다 = cache.get(head); if (있다) return 있다; }
   const m = new Map();
   let p = head, prev = buf.readUInt32LE(head) - 1;
   while (p + 8 <= buf.length) {
@@ -5531,6 +5555,7 @@ function dictFrom(buf, head0) {
     m.set(id, buf.slice(p + 8, p + 8 + len).toString("utf8"));
     prev = id; p += 8 + len;
   }
+  if (cache) cache.set(head, m);
   return m;
 }
 
@@ -5557,6 +5582,7 @@ function localNames(buf) {
   if (!samp.length) return new Map();
 
   const cand = [], seen = new Set();
+  const 사전기억 = new Map();
   for (const s of samp.slice(0, 6)) {
     const key = Buffer.alloc(4); key.writeUInt32LE(s.id);
     let p = -1;
@@ -5568,7 +5594,7 @@ function localNames(buf) {
       if (bad) continue;
       const word = buf.slice(p + 8, p + 8 + n).toString("utf8");
       if (Buffer.byteLength(word, "utf8") !== n) continue;
-      const m = dictFrom(buf, p);
+      const m = dictFrom(buf, p, 사전기억);
       if (m.get(s.id) !== word || m.size < 1000) continue;
       const mark = m.size + ":" + (m.get(0) || "");
       if (seen.has(mark)) continue;
@@ -6452,7 +6478,7 @@ function when(b, p) {
   return { end: v, start: b.readUInt16LE(p + 47), ingame: false };
 }
 
-function honours(file, teams) {
+ function honours(file, teams) {
   const TEAM = new Set(Array.isArray(teams) ? teams.map(Number) : [Number(teams)]);
   const b = fs.readFileSync(file);
   const N = Math.floor((b.length - HEAD) / R);
@@ -7045,6 +7071,103 @@ if (typeof require !== "undefined" && typeof module !== "undefined" && require.m
 }
 
 });</script>
+<script>NodeRun.define("personname.js", function (module, exports, require, process, console, Buffer) {
+
+"use strict";
+const fs = require("fs");
+
+function 칸끝(b, p) {
+  if (p < 0 || p + 8 > b.length) return -1;
+  const L = b.readUInt32LE(p + 4);
+  if (L < 1 || L > 80 || p + 8 + L > b.length) return -1;
+  for (let k = p + 8; k < p + 8 + L; k++) { const c = b[k]; if (c < 0x20 || c === 0x7f) return -1; }
+  return p + 8 + L;
+}
+
+function 사전찾기(b, 최소 = 1000) {
+  const out = [];
+  for (let p = 0; p < b.length - 12; p++) {
+    const L = b.readUInt32LE(p + 4);
+    if (L < 1 || L > 80) continue;
+    let q = p, id = b.readUInt32LE(p), n = 0;
+    for (;;) { const nx = 칸끝(b, q); if (nx < 0 || b.readUInt32LE(q) !== id) break; n++; id++; q = nx; }
+    if (n >= 최소) { out.push({ at: p, n: n, 첫: b.readUInt32LE(p) }); p = q - 1; }
+    else if (n > 3) p = q - 1;
+  }
+  return out;
+}
+
+function 사전읽기(b, at, into) {
+  let p = at, id = b.readUInt32LE(at);
+  for (;;) { const nx = 칸끝(b, p); if (nx < 0 || b.readUInt32LE(p) !== id) break;
+    into.set(id, b.toString("utf8", p + 8, p + 8 + b.readUInt32LE(p + 4))); p = nx; id++; }
+  return into;
+}
+
+function 한칸(b, p, 이름, 성, 표시) {
+  if (b[p] !== 0x10 || p + 30 > b.length) return null;
+  const kind = b[p + 1];
+  let q = p + 2, nm = null;
+  if (kind === 0) {
+    const f = 이름.get(b.readUInt32LE(q)), s = 성.get(b.readUInt32LE(q + 4));
+    if (f === undefined || s === undefined) return null;
+    nm = f + " " + s; q += 8;
+  } else {
+    const t = 표시.get(b.readUInt32LE(q));
+    if (t === undefined) return null;
+    nm = t; q += 4;
+  }
+  q += 8;
+  const uid = b.readUInt32LE(q), d1 = b.readUInt32LE(q + 4), d2 = b.readUInt32LE(q + 8);
+  if (d1 !== d2 || uid < 2 || uid > 4000000) return null;
+  return { end: q + 12, uid: uid, nm: nm, duni: d1 };
+}
+
+function 표만들기(gdbPath) {
+  const b = fs.readFileSync(gdbPath);
+  const 사전 = 사전찾기(b);
+
+  사전.sort((x, y) => x.at - y.at);
+  const 이름 = new Map(), 성 = new Map(), 표시 = new Map();
+  let 앞 = null;
+  for (const s of 사전) {
+    if (앞 && s.첫 === 앞.첫끝 + 1) { 사전읽기(b, s.at, 앞.통); continue; }
+    const 통 = s === 사전[사전.length - 1] ? 표시 : (s.n > 400000 ? 성 : 이름);
+    사전읽기(b, s.at, 통);
+    앞 = { 첫끝: s.첫 + s.n - 1, 통: 통 };
+  }
+  const 표 = new Map(); let 칸 = 0, 겹 = 0;
+  for (let p = 0; p + 30 <= b.length; p++) {
+    if (b[p] !== 0x10) continue;
+    const r = 한칸(b, p, 이름, 성, 표시);
+    if (!r) continue;
+    칸++;
+    if (표.has(r.uid) && 표.get(r.uid) !== r.nm) 겹++;
+    else 표.set(r.uid, r.nm);
+    p = r.end - 1;
+  }
+  표.정보 = { 칸: 칸, 겹: 겹, 이름: 이름.size, 성: 성.size, 표시: 표시.size };
+
+  표.사전 = { 이름: 이름, 성: 성, 표시: 표시 };
+  return 표;
+}
+
+module.exports = { 표만들기, 사전찾기, 사전읽기, 한칸 };
+
+if (require.main === module) {
+  const g = process.argv[2];
+  if (!g) { console.log("쓰기: node --max-old-space-size=8000 save/personname.js <game_db.dat> [UID2…]"); process.exit(1); }
+  const 표 = 표만들기(g);
+  const i = 표.정보;
+  console.log("사전 — 이름 " + i.이름.toLocaleString() + " · 성 " + i.성.toLocaleString() + " · 표시 " + i.표시.toLocaleString());
+  console.log("쪽지 " + i.칸.toLocaleString() + "칸 → UID2 " + 표.size.toLocaleString() + "개 (이름이 둘인 것 " + i.겹 + ")");
+  for (const a of process.argv.slice(3)) {
+    const u = Number(a);
+    console.log("  UID2 " + u + " → " + (표.has(u) ? 표.get(u) : "모름"));
+  }
+}
+
+});</script>
 <script>NodeRun.define("payload.js", function (module, exports, require, process, console, Buffer) {
 "use strict";
 
@@ -7130,18 +7253,37 @@ function cupRounds(file) {
   return rounds;
 }
 
-const PSIG = Buffer.from("01006c0701006c07", "hex");
-
 function scanPeople(file) {
   const g = fs.readFileSync(file);
   const m = new Map();
-  for (let q = 0; q + 9 <= g.length; q++) {
+  const 끝 = g.length - 9;
 
-    if (!(g[q] === 0x01 && g[q + 1] === 0x00 && g[q + 2] === 0x6c && g[q + 3] === 0x07)) continue;
+  let sig = new Int32Array(1 << 20), n = 0;
+  for (let p = g.indexOf(0x6c, 2); p >= 0; p = g.indexOf(0x6c, p + 1)) {
+    const q = p - 2;
+    if (q > 끝) break;
+    if (g[q] !== 0x01 || g[q + 1] !== 0x00 || g[q + 3] !== 0x07) continue;
+    if (n === sig.length) { const t = new Int32Array(sig.length * 2); t.set(sig); sig = t; }
+    sig[n++] = q;
+  }
+
+  const psig = new Int32Array(n);
+  let pn = 0;
+  for (let i = 0, j = 0; i < n; i++) {
+    while (j < n && sig[j] < sig[i] + 4) j++;
+    if (j < n && sig[j] === sig[i] + 4) psig[pn++] = sig[i];
+  }
+
+  let k = 0;
+  for (let i = 0; i < n; i++) {
+    const q = sig[i];
+
     const u2 = g.readUInt32LE(q + 5);
     if (!u2 || u2 === 0xffffffff || u2 > 2000000) continue;
-    const at = g.indexOf(PSIG, q);
-    if (at < 0 || at - q > 1200) continue;
+    while (k < pn && psig[k] < q) k++;
+    if (k >= pn) break;
+    const at = psig[k];
+    if (at - q > 1200) continue;
     const raw = g.readUInt32LE(at + 8);
     const id = (raw >= 1 && raw <= 400000) ? raw : null;
     const len = g.readUInt32LE(at + 44); if (len > 120) continue;
@@ -7220,6 +7362,16 @@ function build(cfg, log) {
   } catch (e) { say("  ⚠ 내보내기 없음 (" + e.message + ") — 내보내기가 필요한 칸은 안 만든다"); ARC = C = null; }
   try { SQ = JSON.parse(fs.readFileSync(R(cfg.squad), "utf8")); } catch (e) { SQ = null; }
 
+  const 뉴스이름_캐시 = new Map();
+  const 뉴스이름 = (paths) => {
+    const key = paths.join(String.fromCharCode(0));
+    if (뉴스이름_캐시.has(key)) return 뉴스이름_캐시.get(key);
+    let r;
+    try { r = require(path.join(AR, "save", "compnames.js")).readAll(paths); }
+    catch (e) { r = { map: new Map(), files: 0, clash: 0 }; }
+    뉴스이름_캐시.set(key, r);
+    return r;
+  };
   let COMP = null;
   part("⓪ 대회 이름표", () => {
     const g = (D.gameDb || [])[0];
@@ -7230,7 +7382,7 @@ function build(cfg, log) {
     let 더함 = 0;
     if (nd0.length) {
       try {
-        for (const [k, v] of require(path.join(AR, "save", "compnames.js")).readAll(nd0).map) {
+        for (const [k, v] of 뉴스이름(nd0).map) {
           if (!COMP.has(k) && v && v.name) { COMP.set(k, v.name); 더함++; }
         }
       } catch (e) { say("  뉴스 쪽 대회 이름 합치기 실패: " + e.message); }
@@ -7471,7 +7623,7 @@ function build(cfg, log) {
     const h = require("./save/honours.js").honours(f, TEAMS);
     let NAME = new Map();
     const nd = (D.news || []).map((p) => R(p)).filter((p) => p && fs.existsSync(p));
-    if (nd.length) { try { NAME = require("./save/compnames.js").readAll(nd).map; } catch (e) {   } }
+    if (nd.length) NAME = 뉴스이름(nd).map;
     const rows = [...h.entries()].filter(([, e]) => e.win.length || e.lose.length || e.third.length)
       .map(([comp, e]) => ({
         comp: comp,
@@ -7731,12 +7883,11 @@ function build(cfg, log) {
     } else { 탈.push("내보내기 다리: 구단 이름이 없어 안 놓음(커리어가 섞인다)"); }
     try { DICT = NM.dictionary(g0); } catch (e) { 탈.push("성 사전:" + e.message); }
 
-    try { LOCAL = NM.localNames(g0); } catch (e) { 탈.push("표시 이름 사전:" + e.message); }
-
     let STUB = new Map(), 이름사전 = new Map();
     try { const PNM = require(path.join(AR, "save", "personname.js"));
           STUB = PNM.표만들기(gdbs[0]);
           이름사전 = (STUB.사전 && STUB.사전.이름) || new Map();
+          LOCAL = (STUB.사전 && STUB.사전.표시) || new Map();
     } catch (e) { 탈.push("쪽지 표:" + e.message); }
 
     NAMEOF = (u2) => {
@@ -9245,7 +9396,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="71d2f120";</script>
+<script>window.__BUILD="97ced2ed";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
