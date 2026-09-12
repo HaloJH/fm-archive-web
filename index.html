@@ -4139,7 +4139,8 @@ const BODY = `<div id="app" v-cloak>
           </div>
           <div class="trophy-row" v-if="honOf(t.season).length">
             <template v-for="h in honOf(t.season)" :key="h.name">
-              <img v-if="pix(h)" :src="pix(h)" :alt="h.short || h.name" :title="h.short || h.name">
+              <img v-if="anyPix(h)" :src="anyPix(h)" :alt="h.short || h.name" :title="h.short || h.name">
+              <span v-else :title="h.short || h.name" v-html="trophySvg(h, 34)"></span>
               <div v-else class="g" :title="h.short || h.name">★</div>
             </template>
           </div>
@@ -4177,7 +4178,7 @@ const BODY = `<div id="app" v-cloak>
     <div class="panels">
       <div class="panel p12"><h3>명예의 전당 <small>{{ hofRows.length }}개 대회 · 순서는 종류 규칙(추정)</small></h3>
         <div class="hrow" v-for="h in hofRows" :key="h.name" style="grid-template-columns:230px 1fr 40px;margin-bottom:9px">
-          <span class="n"><img v-if="pix(h)" :src="pix(h)" alt="" style="width:22px;height:22px;object-fit:contain;vertical-align:middle;margin-right:6px">{{ h.short || h.name }}<span v-if="h.youth" class="dim"> (유스)</span></span>
+          <span class="n"><img v-if="anyPix(h)" :src="anyPix(h)" alt="" style="width:22px;height:22px;object-fit:contain;vertical-align:middle;margin-right:6px"><span v-else style="display:inline-block;width:22px;vertical-align:middle;margin-right:6px" v-html="trophySvg(h, 18)"></span>{{ h.short || h.name }}<span v-if="h.youth" class="dim"> (유스)</span></span>
           <span><span class="t" style="display:block"><i :style="{width:(100*h.win.length/hofMax)+'%'}"></i></span><span class="hon-yrs">{{ h.win.join(' · ') }}<template v-if="h.lose && h.lose.length"> · 준우승 {{ h.lose.length }}</template><template v-if="h.third && h.third.length"> · 3위 {{ h.third.length }}</template></span></span>
           <span class="c">{{ h.win.length }}</span></div></div>
       <div class="panel p12" v-if="squadRows.length"><h3>선수단 <small>{{ squadRows.length }}명 · 저장 시점 · 이름을 누르면 그 선수로</small></h3>
@@ -4208,7 +4209,7 @@ const BODY = `<div id="app" v-cloak>
   </div>
   <div class="panels">
     <div class="panel p12" v-if="won.length || lost.length"><h3>진열대 <small>{{ won.length }}개 우승</small></h3><div class="cab">
-      <div class="t" v-for="h in won" :key="'w'+h.name"><img v-if="pix(h)" :src="pix(h)" alt=""><div v-else class="g">★</div><em>{{ h.short || h.name }}</em>우승</div>
+      <div class="t" v-for="h in won" :key="'w'+h.name"><img v-if="anyPix(h)" :src="anyPix(h)" alt=""><div v-else v-html="trophySvg(h, 44)"></div><em>{{ h.short || h.name }}</em>우승</div>
       <div class="t lost" v-for="h in lost" :key="'l'+h.name"><div class="g">◇</div><em>{{ h.short || h.name }}</em>{{ h.kind==='cup' ? '결승' : '준우승' }}</div>
     </div></div>
     <div class="panel p8"><h3>커리어 속 위치 <small>이 시즌을 표시</small></h3><div v-html="posChart" @mousemove="tipFrom($event)" @mouseleave="tipOff"></div></div>
@@ -4247,7 +4248,7 @@ const BODY = `<div id="app" v-cloak>
 
 <script type="text/x-template" id="tpl-player">
 <div class="detail">
-  <div class="crumb"><a href="#/">← 타임라인</a><span>/</span><a href="javascript:history.back()">뒤로</a><span>/</span><span>{{ nm }}</span></div>
+  <div class="crumb"><a href="#/">← 타임라인</a><span>/</span><a href="#" @click.prevent="back()">뒤로</a><span>/</span><span>{{ nm }}</span></div>
   <div class="dhead">
     <div class="yr2" style="font-size:clamp(40px,7vw,80px)">{{ nm }}<small v-if="sq && sq.full && sq.full !== nm">{{ sq.full }}</small></div>
     <div>
@@ -4365,6 +4366,24 @@ const SCRIPT = String.raw`<script>
   /* 트로피 그림 — 대회 이름 → cupPix 키. 없으면 별 표식 */
   var PIX = { "잉글랜드 프리미어 리그": "잉글랜드 프리미어 리그", "UEFA Champions League": "UEFA 챔피언스 리그", "잉글랜드 FA 컵": "잉글랜드 FA 컵", "잉글랜드 카라바오 컵": "잉글랜드 카라바오 컵", "UEFA Super Cup": "UEFA 슈퍼컵", "세계 클럽 선수권 대회": "세계 클럽 선수권 대회" };
   var pix = function (h) { var k = PIX[h.name] || h.name; return (D.cupPix && D.cupPix[k]) || null; };
+  /* 캡처 사진이 없으면 사용자 트로피 팩의 일반 그림으로(웹앱이 graphics 에서 읽어 넣는다). 리그는 접시, 컵은 컵. */
+  var gen = function (h) { var G = D.trophyPix; if (!G) return null; var lg = h.kind === 2 || h.kind === 6; return (lg ? G.league || G.plate : G.cup) || G.cup || G.plate || G.league || null; };
+  var anyPix = function (h) { return pix(h) || gen(h); };
+  /* 그림이 아예 없으면 손으로 그린 트로피. 모양은 대회 종류만 보고 고른다(어느 대회인지는 주장하지 않는다). */
+  var SHAPE = { 1: "ears", 2: "plate", 3: "slim", 4: "tall", 5: "shield", 6: "plate", 7: "squat" };
+  function trophySvg(h, size) {
+    var k = SHAPE[h.kind] || "squat", w = size || 34, gold = h.kind === 1 || h.kind === 2;
+    var col = gold ? "var(--gold)" : "var(--claret)";
+    var body = {
+      ears: "<path d='M9 6 H25 V15 C25 22 21 25 17 25 C13 25 9 22 9 15 Z'/><path d='M9 7 C1 7 1 21 8.5 22' fill='none'/><path d='M25 7 C33 7 33 21 25.5 22' fill='none'/><path d='M17 25 V30' fill='none'/><path d='M9 33 H25' stroke-width='2.6' fill='none'/>",
+      plate: "<ellipse cx='17' cy='19' rx='13' ry='9'/><ellipse cx='17' cy='19' rx='7' ry='4.5' fill='var(--bg2)'/>",
+      slim: "<path d='M13 6 H21 V21 C21 27 19 30 17 30 C15 30 13 27 13 21 Z'/><path d='M11 33 H23' stroke-width='2.6' fill='none'/>",
+      tall: "<path d='M11 6 H23 V22 C23 28 20 31 17 31 C14 31 11 28 11 22 Z'/><path d='M10 34 H24' stroke-width='2.6' fill='none'/>",
+      shield: "<path d='M6 6 H28 V19 C28 29 22 34 17 37 C12 34 6 29 6 19 Z'/><path d='M11 14 H23' stroke='var(--bg2)' fill='none'/>",
+      squat: "<path d='M10 8 H24 V18 C24 23 21 26 17 26 C13 26 10 23 10 18 Z'/><path d='M10 32 H24' stroke-width='2.6' fill='none'/><path d='M17 26 V30' fill='none'/>"
+    }[k];
+    return "<svg viewBox='0 0 34 40' width='" + w + "' height='" + Math.round(w * 40 / 34) + "' fill='" + col + "' stroke='" + col + "' stroke-width='1.6' stroke-linejoin='round' aria-hidden='true'>" + body + "</svg>";
+  }
   var isTopWin = function (t) { return t.standing && t.standing.pos === 1 && tier(t) === 1; };
   var trs = function (season) { return (D.transfers || []).filter(function (x) { return x.season === season; }); };
   var mineSlots = function (b) { return (b.slots || []).filter(function (s) { return s.mine && s.name; }); };
@@ -4425,21 +4444,46 @@ const SCRIPT = String.raw`<script>
     return s + "</svg><div class='legend'>" + legend + "</div>";
   }
 
-  /* ── 라우터: #/  #/season/2032-33  #/player/이름 ── */
-  function parseRoute() {
-    var h = location.hash || "#/", m;
+  /* ── 라우터: #/  #/season/2032-33  #/player/이름 ──
+   * ★ iframe 안에서는 해시를 쓰지 않는다. srcdoc iframe 의 해시 변경이 **부모 탭 히스토리에 쌓여서**
+   *   브라우저 뒤로가기가 아카이브를 닫아 버렸다(웹앱에서 실제로 났다). 안에서는 내부 스택으로만 움직인다. */
+  var EMBED = (function () { try { return window.top !== window.self; } catch (e) { return true; } })();
+  var HERE = "#/", STACK = [];
+  function parseRoute(h) {
+    h = h || (EMBED ? HERE : (location.hash || "#/")); var m;
     if ((m = h.match(/^#\/season\/([\d-]+)$/))) return { view: "season-view", season: m[1] };
     if ((m = h.match(/^#\/player\/(.+)$/))) return { view: "player-view", name: decodeURIComponent(m[1]) };
     return { view: "timeline-view" };
+  }
+  /* 화면 이동은 전부 여기로. 바깥에서 열면 해시를 쓰고(주소를 복사할 수 있다), 안에서 열면 내부 상태만 바꾼다. */
+  function nav(target) {
+    if (!EMBED) { location.hash = target; return; }
+    if (target !== HERE) STACK.push(HERE);
+    HERE = target; if (window.__go) window.__go();
+  }
+  function goBack() {
+    if (!EMBED) { history.back(); return; }
+    HERE = STACK.pop() || "#/"; if (window.__go) window.__go();
   }
   var savedY = 0;
   var app = Vue.createApp({
     data: function () { return { D: D, T: T, open: OPEN, route: parseRoute(), tip: { on: false, x: 0, y: 0, html: "" } }; },
     computed: { view: function () { return this.route.view; } },
     provide: function () { var self = this; return { showTip: function (e, html) { self.tip.html = html; self.tip.on = true; self.tip.x = e.clientX; self.tip.y = e.clientY; }, hideTip: function () { self.tip.on = false; } }; },
-    mounted: function () { var self = this; window.addEventListener("hashchange", function () { self.route = parseRoute(); self.$nextTick(function () { window.scrollTo(0, self.route.view === "timeline-view" ? savedY : 0); }); }); }
+    mounted: function () { var self = this;
+      var refresh = function () { self.route = parseRoute(); self.$nextTick(function () { window.scrollTo(0, self.route.view === "timeline-view" ? savedY : 0); }); };
+      window.__go = refresh;
+      if (!EMBED) window.addEventListener("hashchange", refresh);
+      /* 안에서 열렸으면 #/ 링크를 가로채 부모 히스토리를 안 건드린다 */
+      document.addEventListener("click", function (e) {
+        if (!EMBED) return;
+        var a = e.target && e.target.closest ? e.target.closest('a[href^="#/"]') : null;
+        if (!a) return; e.preventDefault(); nav(a.getAttribute("href"));
+      });
+    }
   });
-  var shared = { M: M, pix: pix, honOf: honOf, lostOf: lostOf, recOf: recOf, tier: tier, isTopWin: isTopWin };
+  app.config.globalProperties.back = goBack;
+  var shared = { M: M, pix: pix, anyPix: anyPix, trophySvg: trophySvg, honOf: honOf, lostOf: lostOf, recOf: recOf, tier: tier, isTopWin: isTopWin };
 
   app.component("timeline-view", {
     template: "#tpl-timeline", props: ["route"],
@@ -4479,13 +4523,13 @@ const SCRIPT = String.raw`<script>
       goldOf: function (season) { return (D.awards && D.awards.golden || []).filter(function (g) { return g.year === endYear(season) - 1 && g.mine; })[0] || null; },
       open_: function (t, e) {
         savedY = window.scrollY; var target = "#/season/" + t.season;
-        if (reduced) { location.hash = target; return; }
+        if (reduced) { nav(target); return; }
         var card = e.currentTarget, r = card.getBoundingClientRect(), cv = document.createElement("div");
         cv.className = "cover" + (card.classList.contains("win") ? " win" : "");
         cv.style.cssText = "top:" + r.top + "px;left:" + r.left + "px;width:" + r.width + "px;height:" + r.height + "px";
         document.body.appendChild(cv);
         requestAnimationFrame(function () { requestAnimationFrame(function () { cv.classList.add("full"); }); });
-        setTimeout(function () { location.hash = target; cv.style.transition = "opacity .3s"; cv.style.opacity = "0"; setTimeout(function () { cv.remove(); }, 320); }, 480);
+        setTimeout(function () { nav(target); cv.style.transition = "opacity .3s"; cv.style.opacity = "0"; setTimeout(function () { cv.remove(); }, 320); }, 480);
       }
     }),
     mounted: function () {   /* 첫 화면 밖의 카드만 pending 으로 두고, 보이면 푼다 — 첫 화면은 그대로 보여야 한다 */
