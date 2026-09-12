@@ -7857,20 +7857,42 @@ function build(cfg, log) {
 
   part("⑪ 재임 구단의 명예", () => {
     const f2 = NEED(D.compHistory, "대회 이력(dumps.compHistory)");
-    const SP = out.spells || [];
+
+    const Y4 = (v) => Number(String(v).slice(0, 4));
+    const SP = (SPELLS && SPELLS.length)
+      ? SPELLS.map((sp) => ({ team: sp.team, a: Y4(sp.from), b: sp.until ? Y4(sp.until) : 9999 }))
+      : (out.spells || []).map((sp) => ({ team: sp.team, a: sp.from, b: sp.to }));
     if (!SP.length) throw new Error("재임(spells)이 없다");
+
+    const 시즌팀 = new Set();
+    for (const t of out.timeline || []) {
+      if (t.team == null) continue;
+      const y0 = parseInt(String(t.season).slice(0, 4), 10);
+      if (!y0) continue;
+      const 한해 = !/^\d{4}-\d{2}$/.test(String(t.season));
+      시즌팀.add(t.team + "|" + (한해 ? y0 : y0 + 1));
+    }
+    const 연표해 = new Set([...시즌팀].map((k) => Number(k.split("|")[1])));
+    const 안에 = (team, y, summer) => 시즌팀.has(team + "|" + y) ||
+      (!연표해.has(y) && SP.some((p) => p.team === team &&
+        (summer ? (p.a <= y && y <= p.b) : (p.a < y && y <= p.b))));
+    const 아무재임 = (y, summer) => 연표해.has(y) || SP.some((p) =>
+      (summer ? (p.a <= y && y <= p.b) : (p.a < y && y <= p.b)));
     if (!out.honours) throw new Error("명예의 전당이 없다");
     const H = require("./save/honours.js").honours;
     const byComp = new Map(out.honours.map((h) => [h.comp, h]));
     let 더함 = 0, 새대회 = 0, 버림 = 0;
+
+    const YOUTH = (out.teams && out.teams.youth) || [];
+    const 허용 = new Set();
     for (const sp of SP) {
-      let m; try { m = H(f2, [sp.team]); } catch (e) { continue; }
+      const 팀들 = sp.team === ME ? [sp.team].concat(YOUTH) : [sp.team];
+      let m; try { m = H(f2, 팀들); } catch (e) { continue; }
       for (const [comp, e] of m) {
         for (const [칸, 이름] of [[e.win, "win"], [e.lose, "lose"], [e.third, "third"]]) {
           for (const y of 칸 || []) {
-
-            const 안 = e.summer ? (y >= sp.from && y <= sp.to) : (y > sp.from && y <= sp.to);
-            if (!안) { 버림++; continue; }
+            if (!안에(sp.team, y, e.summer)) { 버림++; continue; }
+            허용.add(comp + "|" + 이름 + "|" + y);
             let row = byComp.get(comp);
             if (!row) {
               row = { comp: comp, name: null, short: null, win: [], lose: [], third: [],
@@ -7886,10 +7908,24 @@ function build(cfg, log) {
       }
     }
 
+    let 밖에버림 = 0;
+    for (const h of out.honours) {
+      for (const 이름 of ["win", "lose", "third"]) {
+
+        const 남길것 = (h[이름] || []).filter((y) =>
+          허용.has(h.comp + "|" + 이름 + "|" + y) ||
+          ((h.fromBridge || []).indexOf(y) >= 0 && 아무재임(y, h.summer)));
+        밖에버림 += (h[이름] || []).length - 남길것.length;
+        h[이름] = 남길것;
+      }
+    }
+    out.honours = out.honours.filter((h) => h.win.length || h.lose.length || h.third.length);
+
     let 순위붙임 = 0;
+    const byComp2 = new Map(out.honours.map((h) => [h.comp, h]));
     for (const t of out.timeline || []) {
       if (t.standing || t.division == null) continue;
-      const row = byComp.get(t.division);
+      const row = byComp2.get(t.division);
       if (!row || row.kind !== "league") continue;
       const y0 = parseInt(String(t.season).slice(0, 4), 10);
       const y = row.summer ? y0 : y0 + 1;
@@ -7901,7 +7937,7 @@ function build(cfg, log) {
       순위붙임++;
     }
     return "재임 " + SP.length + "번 · 새로 채운 명예 " + 더함 + "건" +
-      (새대회 ? " · 없던 대회 " + 새대회 + "종" : "") + " · 재임 밖이라 버림 " + 버림 +
+      (새대회 ? " · 없던 대회 " + 새대회 + "종" : "") + " · 재임 밖이라 버림 " + (버림 + 밖에버림) +
       " · 순위 채움 " + 순위붙임 + "시즌";
   }, note);
 
@@ -9209,7 +9245,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="2ad916e4";</script>
+<script>window.__BUILD="71d2f120";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
