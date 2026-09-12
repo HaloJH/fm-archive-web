@@ -5212,7 +5212,9 @@ for (const y of years) {
           break;
         }
         const js = s.can[idx].map((v, j) => (v ? j : -1)).filter((j) => j >= 0);
-        if (js.length !== 1) rec.why = "못 정함 — 후보 " + js.length + "개";
+
+        if (js.length === 1 && lo < 0) rec.why = "못 정함 — 득점 창을 " + (-lo) + " 넓혀야 맞아 못 믿는다";
+        else if (js.length !== 1) rec.why = "못 정함 — 후보 " + js.length + "개";
         else {
           const r = s.g[js[0]];
           rec.standing = { pos: r.pos + 1, teams: s.g.length, played: r.pl, w: r.w, d: r.d, l: r.l,
@@ -9152,7 +9154,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="43a973fa";</script>
+<script>window.__BUILD="b8d0291d";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
