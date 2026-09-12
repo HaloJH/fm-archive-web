@@ -4126,11 +4126,11 @@ const BODY = `<div id="app" v-cloak>
   <div class="story">
     <template v-for="(t,i) in T" :key="t.season">
       <div class="yr" :class="{win: isTopWin(t)}">{{ t.season.slice(0,4) }}<small>{{ t.season }}</small></div>
-      <div class="rail"><div class="node" :class="['t'+tier(t), {win: honOf(t.season).length>0}]">{{ t.standing ? t.standing.pos : '·' }}</div></div>
+      <div class="rail"><div class="node" :class="['t'+tier(t), {win: honOf(t.season).length>0}]">{{ t.standing ? t.standing.pos : (t.rank ? t.rank.pos : '·') }}</div></div>
       <div class="chap">
         <div class="card" :class="{win: honOf(t.season).length>0, pending: pending[i]}" tabindex="0" role="link" :aria-label="t.season+' 시즌 상세'" @click="open_(t,$event)" @keydown.enter.prevent="open_(t,$event)" @keydown.space.prevent="open_(t,$event)">
           <span class="more">자세히 →</span>
-          <div class="head"><span class="pos" v-if="t.standing">{{ t.standing.pos }}<span>위 / {{ t.standing.teams }}팀</span></span><span class="pos" v-else style="font-size:16px">순위 기록 없음</span><span class="div">{{ t.divName }}</span><span class="season">{{ t.season }}</span></div>
+          <div class="head"><span class="pos" v-if="t.standing">{{ t.standing.pos }}<span>위 / {{ t.standing.teams }}팀</span></span><span class="pos" v-else-if="t.rank">{{ t.rank.pos }}<span>위</span></span><span class="pos" v-else style="font-size:16px">순위 기록 없음</span><span class="div">{{ t.divName }}</span><span class="season">{{ t.season }}</span></div>
           <div class="row">
             <div v-if="t.standing"><h4>디비전</h4><div class="ladder"><i v-for="k in [5,4,3,2,1]" :key="k" :class="{on: k>=tier(t)}" :style="{height:(20+(6-k)*16)+'%'}" :title="k+'부'"></i></div></div>
             <div v-if="t.standing"><h4>전적</h4><div class="v"><b>{{ t.standing.w }}승 {{ t.standing.d }}무 {{ t.standing.l }}패</b><br><small>{{ t.standing.pts }}점 · 득실 {{ t.standing.gf }}:{{ t.standing.ga }}<template v-if="t.stats"> · 평점 {{ t.stats.avgRating }}</template></small></div></div>
@@ -4409,7 +4409,7 @@ const SCRIPT = String.raw`<script>
     }[k];
     return "<svg viewBox='0 0 34 40' width='" + w + "' height='" + Math.round(w * 40 / 34) + "' fill='" + col + "' stroke='" + col + "' stroke-width='1.6' stroke-linejoin='round' aria-hidden='true'>" + body + "</svg>";
   }
-  var isTopWin = function (t) { return t.standing && t.standing.pos === 1 && tier(t) === 1; };
+  var isTopWin = function (t) { var p = t.standing ? t.standing.pos : (t.rank ? t.rank.pos : 0); return p === 1 && tier(t) === 1; };
   var trs = function (season) { return (D.transfers || []).filter(function (x) { return x.season === season; }); };
   var mineSlots = function (b) { return (b.slots || []).filter(function (s) { return s.mine && s.name; }); };
   var mineOf = function (b) { return (b.slots || []).filter(function (s) { return s.mine; }).length; };
@@ -7855,6 +7855,56 @@ function build(cfg, log) {
     return out.bestxi.length + "개";
   }, note);
 
+  part("⑪ 재임 구단의 명예", () => {
+    const f2 = NEED(D.compHistory, "대회 이력(dumps.compHistory)");
+    const SP = out.spells || [];
+    if (!SP.length) throw new Error("재임(spells)이 없다");
+    if (!out.honours) throw new Error("명예의 전당이 없다");
+    const H = require("./save/honours.js").honours;
+    const byComp = new Map(out.honours.map((h) => [h.comp, h]));
+    let 더함 = 0, 새대회 = 0, 버림 = 0;
+    for (const sp of SP) {
+      let m; try { m = H(f2, [sp.team]); } catch (e) { continue; }
+      for (const [comp, e] of m) {
+        for (const [칸, 이름] of [[e.win, "win"], [e.lose, "lose"], [e.third, "third"]]) {
+          for (const y of 칸 || []) {
+
+            const 안 = e.summer ? (y >= sp.from && y <= sp.to) : (y > sp.from && y <= sp.to);
+            if (!안) { 버림++; continue; }
+            let row = byComp.get(comp);
+            if (!row) {
+              row = { comp: comp, name: null, short: null, win: [], lose: [], third: [],
+                      summer: e.summer, kind: e.kind, teams: [sp.team], youth: false };
+              out.honours.push(row); byComp.set(comp, row); 새대회++;
+            }
+            if (row[이름].indexOf(y) >= 0) continue;
+            row[이름].push(y); row[이름].sort((a, b) => a - b);
+            (row.fromSpell = row.fromSpell || []).push(이름 + y);
+            더함++;
+          }
+        }
+      }
+    }
+
+    let 순위붙임 = 0;
+    for (const t of out.timeline || []) {
+      if (t.standing || t.division == null) continue;
+      const row = byComp.get(t.division);
+      if (!row || row.kind !== "league") continue;
+      const y0 = parseInt(String(t.season).slice(0, 4), 10);
+      const y = row.summer ? y0 : y0 + 1;
+      const pos = (row.win || []).indexOf(y) >= 0 ? 1
+        : (row.lose || []).indexOf(y) >= 0 ? 2
+        : (row.third || []).indexOf(y) >= 0 ? 3 : 0;
+      if (!pos) continue;
+      t.rank = { pos: pos, by: "대회이력" };
+      순위붙임++;
+    }
+    return "재임 " + SP.length + "번 · 새로 채운 명예 " + 더함 + "건" +
+      (새대회 ? " · 없던 대회 " + 새대회 + "종" : "") + " · 재임 밖이라 버림 " + 버림 +
+      " · 순위 채움 " + 순위붙임 + "시즌";
+  }, note);
+
   part("⑫ 트로피 번호 다리", () => {
     const ids = cfg.trophyIds || [];
     if (!ids.length) throw new Error("트로피 팩 번호 목록(cfg.trophyIds)이 없다 — 빗장 없이는 안 붙인다");
@@ -9159,7 +9209,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="ebed1ae0";</script>
+<script>window.__BUILD="2ad916e4";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
