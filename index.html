@@ -7727,6 +7727,27 @@ function build(cfg, log) {
     return out.bestxi.length + "개";
   }, note);
 
+  part("⑫ 트로피 번호 다리", () => {
+    const ids = cfg.trophyIds || [];
+    if (!ids.length) throw new Error("트로피 팩 번호 목록(cfg.trophyIds)이 없다 — 빗장 없이는 안 붙인다");
+    const gd = (cfg.dumps && cfg.dumps.gameDb) || [];
+    if (!gd.length) throw new Error("game_db 가 없다");
+
+    const cups = (out.honours || []).filter((h) => h.kind === "cup" && h.comp).map((h) => h.comp);
+    if (!cups.length) throw new Error("컵이 없다");
+    const { compUid } = require("./save/comptrophy.js");
+    const valid = new Set(ids.map(Number));
+    const map = {};
+    for (const file of gd) {
+      const m = compUid(fs.readFileSync(file), cups, valid);
+      for (const [k, v] of m) map[k] = v;
+      if (Object.keys(map).length >= cups.length) break;
+    }
+    if (!Object.keys(map).length) throw new Error("이은 대회가 없다");
+    out.compUid = map;
+    return Object.keys(map).length + "/" + cups.length + "개 이음";
+  }, note);
+
   part("⑩ 이적", () => {
     if (ME == null) throw new Error("팀 번호를 모른다");
     const TR = require(path.join(AR, "save", "transfer.js"));
@@ -7798,7 +7819,7 @@ function build(cfg, log) {
   const ORDER = ["club", "generatedAt", "savedAt", "timeline", "squad", "curves",
     "trophies", "records", "rosters", "runs", "leagues", "honours",
     "worldcup", "spells", "awards", "podium", "cupPix", "shapes", "asiancup", "bestxi", "nations",
-    "transfers", "careers"];
+    "transfers", "careers", "compUid"];
   const tidy = {};
   for (const k of ORDER) if (k in out) tidy[k] = out[k];
   for (const k of Object.keys(out)) if (!(k in tidy)) tidy[k] = out[k];
@@ -7884,7 +7905,9 @@ function classify(files) {
     } else if (p.endsWith(".fm")) {
       if (p.indexOf("/games/") >= 0) fm.push(f);
       else looseFm.push(f);
-    } else if (p.endsWith(".png") && p.indexOf("/default/") >= 0 && p.indexOf("troph") >= 0) {
+    } else if (p.endsWith(".png") && p.indexOf("troph") >= 0 &&
+               (p.indexOf("/default/") >= 0 || /^\d+\.png$/.test(p.split("/").pop()))) {
+
       TROPHY_FILES.set(p.split("/").pop().replace(/.png$/, ""), f);
     }
   }
@@ -8219,6 +8242,8 @@ async function buildCareer(pt, say) {
     data: "/ar/data.json",
     squad: "/없음.json",
     dumps: {}, capture: {},
+
+    trophyIds: [...TROPHY_FILES.keys()].filter((k) => /^\d+$/.test(k)).map(Number),
     rounds: { worldcup: 473, asiancup: 3221 },
   };
 
@@ -8269,12 +8294,24 @@ async function buildCareer(pt, say) {
   say("화면 만드는 중");
 
   const pix = await trophyPix();
-  if (pix) {
-    try {
-      const o = JSON.parse(json);
-      o.trophyPix = pix;
-      return careerHtml(o);
-    } catch (e) {   }
+  let o = null;
+  try { o = JSON.parse(json); } catch (e) { o = null; }
+  if (o) {
+    if (pix) o.trophyPix = pix;
+
+    if (o.compUid && o.honours) {
+      o.cupPix = o.cupPix || {};
+      let got = 0;
+      for (const h of o.honours) {
+        const uid = o.compUid[h.comp];
+        if (!uid || !h.name || o.cupPix[h.name]) continue;
+        const file = TROPHY_FILES.get(String(uid));
+        if (!file) continue;
+        try { o.cupPix[h.name] = await shrink(file, 96); got++; } catch (e) {   }
+      }
+      if (got) say("트로피 " + got + "개를 팩에서 붙였습니다");
+    }
+    if (pix || o.cupPix) return careerHtml(o);
   }
   return careerHtml(json);
 }
@@ -8893,7 +8930,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="8b41548c";</script>
+<script>window.__BUILD="ed58ead3";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
