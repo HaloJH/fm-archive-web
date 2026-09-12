@@ -7873,6 +7873,36 @@ function build(cfg, log) {
            (이름붙임 ? " · 이름 " + 이름붙임 + "개" : "");
   }, note);
 
+  part("⑬ 리그 1위 = 우승", () => {
+    const T = out.timeline || [], H = out.honours;
+    if (!T.length) throw new Error("연표가 없다");
+    if (!H) throw new Error("명예표가 없다");
+    const byComp = new Map(H.map((h) => [h.comp, h]));
+    let 더함 = 0, 이미 = 0, 새대회 = 0;
+    for (const t of T) {
+      const st = t.standing;
+      if (!st || st.pos !== 1 || t.division == null) continue;
+      const y0 = parseInt(String(t.season).slice(0, 4), 10);
+      if (!y0) continue;
+      let row = byComp.get(t.division);
+      if (!row) {
+        row = { comp: t.division, win: [], lose: [], third: [], summer: false,
+                kind: "league", teams: [], youth: false };
+
+        if (t.divName && !/^디비전 /.test(t.divName)) { row.name = t.divName; row.short = t.divName; }
+        H.push(row); byComp.set(t.division, row); 새대회++;
+      }
+
+      const y = row.summer ? y0 : y0 + 1;
+      if (row.win.indexOf(y) >= 0) { 이미++; continue; }
+      row.win.push(y); row.win.sort((a, b) => a - b);
+      (row.fromRank = row.fromRank || []).push(y);
+      더함++;
+    }
+    return "1위 시즌 " + (더함 + 이미) + "회 · 새로 채움 " + 더함 +
+           " · 이미 있던 것 " + 이미 + (새대회 ? " · 없던 대회 " + 새대회 + "종" : "");
+  }, note);
+
   part("⑩ 이적", () => {
     if (ME == null) throw new Error("팀 번호를 모른다");
     const TR = require(path.join(AR, "save", "transfer.js"));
@@ -9097,7 +9127,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="ea4764ad";</script>
+<script>window.__BUILD="a9d00f92";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
