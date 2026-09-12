@@ -6266,13 +6266,64 @@ function settle(cand, names, packIds) {
   return out;
 }
 
+function 표식다리(buf, wanted) {
+  const out = new Map();
+  const want = new Set((wanted || []).map(Number).filter((n) => n > 0 && n <= 65535));
+  if (!want.size) return out;
+  const 찾는번호 = new Uint8Array(65536);
+  for (const c of want) 찾는번호[c] = 1;
+  const n = buf.length;
+  const 여럿 = new Set();
+  for (let q = 24; q + 33 < n; q++) {
+    if (buf[q + 2] !== 0 || buf[q + 3] !== 0) continue;
+    const c = buf[q] | (buf[q + 1] << 8);
+    if (!찾는번호[c]) continue;
+    const v = buf.readUInt32LE(q + 4);
+    if (v < 100000 || v !== buf.readUInt32LE(q + 8)) continue;
+
+    let ok = true;
+    for (let i = 15; i <= 24; i++) if (buf[q - i] !== 255) { ok = false; break; }
+    if (!ok) continue;
+    if (buf[q - 14] !== 1 || buf[q - 8] !== 7 || buf[q - 6] !== 0 || buf[q - 4] !== 7 || buf[q - 1] !== 255) continue;
+    if (buf[q + 15] !== 1 || buf[q + 26] !== 1 || buf[q + 32] !== 2) continue;
+    const 있던것 = out.get(c);
+    if (있던것 == null) out.set(c, v);
+    else if (있던것 !== v) 여럿.add(c);
+  }
+  for (const c of 여럿) out.delete(c);
+  return out;
+}
+
+function 리그다리(cand, names, 리그이름, buf) {
+  const out = new Map();
+  if (!cand || !names || !리그이름) return out;
+  const 표식 = buf ? 표식다리(buf, [...리그이름.keys()]) : new Map();
+  for (const [comp, 아는이름] of 리그이름) {
+
+    let 이름것 = null, 여럿 = false;
+    const set = cand.get(comp);
+    if (set) for (const v of set) {
+      const nm = names.get(v);
+      if (!nm || nm.name !== 아는이름) continue;
+      if (이름것 != null && 이름것 !== v) { 여럿 = true; break; }
+      이름것 = v;
+    }
+    if (여럿) 이름것 = null;
+    const 표식것 = 표식.has(comp) ? 표식.get(comp) : null;
+    if (표식것 != null && 이름것 != null) { if (표식것 === 이름것) out.set(comp, 표식것);   }
+    else if (표식것 != null) out.set(comp, 표식것);
+    else if (이름것 != null) out.set(comp, 이름것);
+  }
+  return out;
+}
+
 function compUid(buf, wanted, valid) {
   if (!wanted || !wanted.length) return new Map();
   const { cand, names } = scan(buf, wanted);
   return settle(cand, names, valid ? [...valid] : []);
 }
 
-module.exports = { scan: scan, settle: settle, compUid: compUid };
+module.exports = { scan: scan, settle: settle, compUid: compUid, 리그다리: 리그다리, 표식다리: 표식다리 };
 
 if (typeof require !== "undefined" && typeof module !== "undefined" && require.main === module) {
   const fs = require("fs"), path = require("path");
@@ -7394,21 +7445,18 @@ function build(cfg, log) {
     for (const h of out.honours || []) if (h.kind === "league" && h.comp && h.name) 리그이름.set(h.comp, h.name);
     const 넘길것 = cups.concat([...리그이름.keys()]);
 
-    const { scan, settle } = require(path.join(AR, "save", "comptrophy.js"));
+    const { scan, settle, 리그다리 } = require(path.join(AR, "save", "comptrophy.js"));
     const map = {};
-    let 이름붙임 = 0, 리그붙임 = 0, 리그버림 = 0;
+    let 이름붙임 = 0, 리그붙임 = 0;
     for (const file of gd) {
-      const { cand, names } = scan(fs.readFileSync(file), 넘길것);
+      const buf = fs.readFileSync(file);
+      const { cand, names } = scan(buf, 넘길것);
 
       for (const [k, v] of settle(cand, names, ids)) if (map[k] == null && !리그이름.has(k)) map[k] = v;
 
-      for (const [k, 아는이름] of 리그이름) {
+      for (const [k, v] of 리그다리(cand, names, 리그이름, buf)) {
         if (map[k] != null) continue;
-        const set = cand.get(k);
-        if (!set) continue;
-        const 맞는것 = [...set].filter((v) => { const nm = names.get(v); return nm && nm.name === 아는이름; });
-        if (맞는것.length === 1) { map[k] = 맞는것[0]; 리그붙임++; }
-        else if (맞는것.length > 1) 리그버림++;
+        map[k] = v; 리그붙임++;
       }
 
       for (const h of out.honours || []) {
@@ -7426,8 +7474,7 @@ function build(cfg, log) {
     out.compUid = map;
     return Object.keys(map).length + "/" + 넘길것.length + "개 이음" +
            (이름붙임 ? " · 이름 " + 이름붙임 + "개" : "") +
-           (리그붙임 ? " · 리그 " + 리그붙임 + "개(이름 맞음)" : "") +
-           (리그버림 ? " · 리그 " + 리그버림 + "개는 이름이 안 맞아 버림" : "") +
+           (리그이름.size ? " · 리그 " + 리그붙임 + "/" + 리그이름.size + "개(이름이 맞는 것만)" : "") +
            (ids.length ? "" : " · ⚠ 트로피 팩 없이 (이름 빗장만) — 팩이 있으면 훨씬 많이 붙는다");
   }, note);
 
@@ -8666,7 +8713,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="21235582";</script>
+<script>window.__BUILD="960d605a";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
