@@ -6294,10 +6294,34 @@ function 표식다리(buf, wanted) {
   return out;
 }
 
+function 이름레코드다리(buf, 리그이름) {
+  const out = new Map();
+  if (!buf || !리그이름) return out;
+  for (const [comp, 이름] of 리그이름) {
+    if (!이름) continue;
+    const key = Buffer.from(이름, "utf8");
+    const 본것 = new Set();
+    let p = buf.indexOf(key, 0), 셈 = 0;
+    while (p >= 0 && 셈 < 20) {
+      셈++;
+
+      if (p >= 28 && buf.readUInt32LE(p - 4) === key.length) {
+        const a = buf.readUInt32LE(p - 28);
+        if (a > 0 && a === buf.readUInt32LE(p - 24)) 본것.add(a);
+      }
+      p = buf.indexOf(key, p + 1);
+    }
+    if (본것.size === 1) out.set(comp, [...본것][0]);
+  }
+  return out;
+}
+
 function 리그다리(cand, names, 리그이름, buf) {
   const out = new Map();
   if (!cand || !names || !리그이름) return out;
   const 표식 = buf ? 표식다리(buf, [...리그이름.keys()]) : new Map();
+
+  const 레코드 = buf ? 이름레코드다리(buf, 리그이름) : new Map();
   for (const [comp, 아는이름] of 리그이름) {
 
     let 이름것 = null, 여럿 = false;
@@ -6309,10 +6333,15 @@ function 리그다리(cand, names, 리그이름, buf) {
       이름것 = v;
     }
     if (여럿) 이름것 = null;
-    const 표식것 = 표식.has(comp) ? 표식.get(comp) : null;
-    if (표식것 != null && 이름것 != null) { if (표식것 === 이름것) out.set(comp, 표식것);   }
-    else if (표식것 != null) out.set(comp, 표식것);
-    else if (이름것 != null) out.set(comp, 이름것);
+
+    const 답 = [];
+    if (표식.has(comp)) 답.push(표식.get(comp));
+    if (레코드.has(comp)) 답.push(레코드.get(comp));
+    if (이름것 != null) 답.push(이름것);
+    if (!답.length) continue;
+    let 한결같나 = true;
+    for (const v of 답) if (v !== 답[0]) { 한결같나 = false; break; }
+    if (한결같나) out.set(comp, 답[0]);
   }
   return out;
 }
@@ -6323,7 +6352,7 @@ function compUid(buf, wanted, valid) {
   return settle(cand, names, valid ? [...valid] : []);
 }
 
-module.exports = { scan: scan, settle: settle, compUid: compUid, 리그다리: 리그다리, 표식다리: 표식다리 };
+module.exports = { scan: scan, settle: settle, compUid: compUid, 리그다리: 리그다리, 표식다리: 표식다리, 이름레코드다리: 이름레코드다리 };
 
 if (typeof require !== "undefined" && typeof module !== "undefined" && require.main === module) {
   const fs = require("fs"), path = require("path");
@@ -8713,7 +8742,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="960d605a";</script>
+<script>window.__BUILD="13b2b17f";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
