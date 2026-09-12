@@ -6976,6 +6976,8 @@ function scan(buf, cups) {
     const name = list[0], short = list[list.length - 1];
 
     if (list.length > 1 && name.length === short.length) continue;
+
+    if (list.some((t) => name.indexOf(t) < 0)) continue;
     names.set(id, { name: name, short: short });
   }
   return { cand: cand, names: names };
@@ -9127,7 +9129,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="a9d00f92";</script>
+<script>window.__BUILD="2508bb67";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
