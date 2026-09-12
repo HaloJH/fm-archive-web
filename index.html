@@ -4225,9 +4225,10 @@ const BODY = `<div id="app" v-cloak>
     <div><h2 v-html="hl.h"></h2><div class="sub" v-html="hl.sub"></div></div>
   </div>
   <div class="tiles">
-    <div class="tile"><b class="c">{{ s.pos }}</b><span>{{ s.teams }}팀 중 순위</span></div>
-    <div class="tile"><b>{{ s.pts }}</b><span>승점 · {{ s.w }}승 {{ s.d }}무 {{ s.l }}패</span></div>
-    <div class="tile"><b>{{ gd>0?'+':'' }}{{ gd }}</b><span>득실 {{ s.gf }}:{{ s.ga }}</span></div>
+    <div class="tile" v-if="s"><b class="c">{{ s.pos }}</b><span>{{ s.teams }}팀 중 순위</span></div>
+    <div class="tile" v-else-if="t.rank"><b class="c">{{ t.rank.pos }}</b><span>순위 <span class="guess">대회 이력</span></span></div>
+    <div class="tile" v-if="s"><b>{{ s.pts }}</b><span>승점 · {{ s.w }}승 {{ s.d }}무 {{ s.l }}패</span></div>
+    <div class="tile" v-if="s"><b>{{ gd>0?'+':'' }}{{ gd }}</b><span>득실 {{ s.gf }}:{{ s.ga }}</span></div>
     <div class="tile" v-if="t.stats"><b>{{ t.stats.avgRating }}</b><span>평균 평점 · xG {{ t.stats.xG }}</span></div>
     <div class="tile"><b class="g">{{ won.length }}</b><span>트로피<template v-if="lost.length"> · 준우승 {{ lost.length }}</template></span></div>
     <div class="tile"><b>{{ M(income-spend) }}</b><span>이적 순수입</span></div>
@@ -4445,10 +4446,15 @@ const SCRIPT = String.raw`<script>
       if (won.length > 1 && rank(won[0]) === 1) sub.push(won.slice(1).map(function (w) { return esc(w.short || w.name); }).join(" · ") + " 포함"); }
     else if (up) h = "<em>승격</em> — " + esc(TIERNAME[tr]) + "에서 " + esc(TIERNAME[tr - 1]) + "로";
     else if (lost.length) h = "<em>" + esc(lost[0].short || lost[0].name) + "</em> 준우승";
-    else h = s.pos + "위로 마감";
+    /* 219: s 가 null 일 수 있다 — 순위표 없는 시즌도 카드로 그리기로 했다(210).
+     *   여기서 안 막으면 시즌 화면이 통째로 안 뜬다. 사용자 화면에서 실제로 그랬다:
+     *     TypeError: Cannot read properties of null (reading 'gf') at headline */
+    else if (s) h = s.pos + "위로 마감";
+    else if (t.rank) h = t.rank.pos + "위로 마감<span class='guess'>대회 이력</span>";
+    else h = "순위를 모르는 시즌";
     var f = items.filter(function (x) { return x.r === "우승" && x.foeName && x.foeName.name; })[0];
     if (f) sub.push("결승에서 " + esc(f.foeName.name) + "를 꺾다" + (f.foeName.conf < 0.3 ? "<span class='guess'>상대 추정</span>" : ""));
-    if (s.gf - s.ga >= 60) sub.push("득실 +" + (s.gf - s.ga));
+    if (s && s.gf - s.ga >= 60) sub.push("득실 +" + (s.gf - s.ga));
     if (t.stats && t.stats.cleanSheets >= 18) sub.push("클린시트 " + t.stats.cleanSheets);
     return { h: h, sub: sub.join(" · ") };
   }
@@ -4598,13 +4604,13 @@ const SCRIPT = String.raw`<script>
       i: function () { var s = this.route.season; return T.findIndex(function (t) { return t.season === s; }); },
       t: function () { return this.i >= 0 ? T[this.i] : null; },
       s: function () { return this.t.standing; },
-      gd: function () { return this.s.gf - this.s.ga; },
+      gd: function () { return this.s ? this.s.gf - this.s.ga : null; },
       prev: function () { return T[this.i - 1] || null; }, next: function () { return T[this.i + 1] || null; },
       won: function () { return honOf(this.t.season); }, lost: function () { return lostOf(this.t.season); },
       hl: function () { return headline(this.t, this.i); },
       spend: function () { return this.fees("in").reduce(function (a, x) { return a + x.fee; }, 0); },
       income: function () { return this.fees("out").reduce(function (a, x) { return a + x.fee; }, 0); },
-      perf: function () { var t = this.t, st = t.stats || {}; return [["경기", this.s.played], ["슈팅/경기", st.shots], ["유효슈팅 %", st.onTargetPct], ["패스 성공 %", st.passPct], ["클린시트", st.cleanSheets], ["컵 결승", t.cups && t.cups.finals], ["스쿼드", t.squadSize]].filter(function (r) { return r[1] != null; }); },
+      perf: function () { var t = this.t, st = t.stats || {}; return [["경기", this.s ? this.s.played : null], ["슈팅/경기", st.shots], ["유효슈팅 %", st.onTargetPct], ["패스 성공 %", st.passPct], ["클린시트", st.cleanSheets], ["컵 결승", t.cups && t.cups.finals], ["스쿼드", t.squadSize]].filter(function (r) { return r[1] != null; }); },
       recRows: function () { var r = recOf(this.t.season); return [["최다 출장", r.app], ["최다 득점", r.goal], ["최다 도움", r.assist], ["MOTM", r.motm], ["최고 평점", r.rate]]; },
       xi: function () { var s = this.t.season; return (D.bestxi || []).filter(function (b) { return b.season === s; }); },
       goldYear: function () { return endYear(this.t.season) - 1; },
@@ -9396,7 +9402,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="97ced2ed";</script>
+<script>window.__BUILD="5e5f9ed0";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
