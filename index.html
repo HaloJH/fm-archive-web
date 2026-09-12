@@ -8587,11 +8587,23 @@ const WANT_DIR = /^(exported teams|games)$/i;
 const MAYBE_PARENT = /^(sports interactive|football manager.*|documents|내 문서)$/i;
 const WANT_FILE = /\.(fmf|fm)$/i;
 
-function decideDir(name, depth) {
+const TROPHY_DIR = /troph/i;
+const TROPHY_FILE = /\.png$/i;
+const PROBE_DEPTH = 3;
+const PROBE_CAP = 3000;
+
+function decideDir(name, depth, probeLeft) {
+  if (TROPHY_DIR.test(name)) return "trophy";
   if (WANT_DIR.test(name)) return "take";
   if (depth === 0) return "scan";
   if (MAYBE_PARENT.test(name)) return "scan";
+  if (probeLeft > 0) return "probe";
   return "skip";
+}
+
+function wantFile(name, mode) {
+  if (mode === "probe") return false;
+  return mode === "trophy" ? TROPHY_FILE.test(name) : WANT_FILE.test(name);
 }
 
 const setPath = (f, p) => {
@@ -8601,38 +8613,46 @@ const setPath = (f, p) => {
   return f;
 };
 
-async function walkEntry(entry, out, prefix, depth, takeAll, onScan) {
+async function walkEntry(entry, out, prefix, depth, inherit, onScan, probeLeft) {
   if (entry.isFile) {
-    if (!WANT_FILE.test(entry.name)) return;
+    if (!wantFile(entry.name, inherit)) return;
     const f = await new Promise((res, rej) => entry.file(res, rej));
     out.push(setPath(f, prefix + entry.name));
     onScan(out.length);
     return;
   }
   if (!entry.isDirectory) return;
-  const mode = takeAll ? "take" : decideDir(entry.name, depth);
+
+  const mode = (inherit === "take" || inherit === "trophy")
+    ? inherit : decideDir(entry.name, depth, probeLeft);
   if (mode === "skip") return;
+  const next = mode === "probe" ? probeLeft - 1 : PROBE_DEPTH;
 
   const reader = entry.createReader();
-  let batch;
+  let batch, seen = 0;
   do {
     batch = await new Promise((res, rej) => reader.readEntries(res, rej));
     for (const e of batch) {
-      await walkEntry(e, out, prefix + entry.name + "/", depth + 1, mode === "take", onScan);
+      if (mode === "probe" && ++seen > PROBE_CAP) return;
+      await walkEntry(e, out, prefix + entry.name + "/", depth + 1, mode, onScan, next);
     }
   } while (batch.length);
 }
 
-async function walkHandle(dir, out, prefix, depth, takeAll, onScan) {
-  const mode = takeAll ? "take" : decideDir(dir.name, depth);
+async function walkHandle(dir, out, prefix, depth, inherit, onScan, probeLeft) {
+  const mode = (inherit === "take" || inherit === "trophy")
+    ? inherit : decideDir(dir.name, depth, probeLeft);
   if (mode === "skip") return;
+  const next = mode === "probe" ? probeLeft - 1 : PROBE_DEPTH;
+  let seen = 0;
   for await (const [name, h] of dir.entries()) {
+    if (mode === "probe" && ++seen > PROBE_CAP) return;
     if (h.kind === "file") {
-      if (!WANT_FILE.test(name)) continue;
+      if (!wantFile(name, mode)) continue;
       out.push(setPath(await h.getFile(), prefix + name));
       onScan(out.length);
     } else {
-      await walkHandle(h, out, prefix + name + "/", depth + 1, mode === "take", onScan);
+      await walkHandle(h, out, prefix + name + "/", depth + 1, mode, onScan, next);
     }
   }
 }
@@ -8679,7 +8699,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     let dir;
     try { dir = await window.showDirectoryPicker({ mode: "read" }); }
     catch (e) { return; }
-    collect((out, onScan) => walkHandle(dir, out, "", 0, false, onScan));
+    collect((out, onScan) => walkHandle(dir, out, "", 0, "scan", onScan, PROBE_DEPTH));
   });
   $("folder").addEventListener("change", (e) => handle([].slice.call(e.target.files)));
   $("backBtn").addEventListener("click", closeArchive);
@@ -8704,7 +8724,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     const items = [].slice.call(e.dataTransfer.items)
       .map((i) => (i.webkitGetAsEntry ? i.webkitGetAsEntry() : null)).filter(Boolean);
     collect(async (out, onScan) => {
-      for (const it of items) await walkEntry(it, out, "", 0, false, onScan);
+      for (const it of items) await walkEntry(it, out, "", 0, "scan", onScan, PROBE_DEPTH);
     });
   });
 });
@@ -8972,7 +8992,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="776458ac";</script>
+<script>window.__BUILD="e7d97c48";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
