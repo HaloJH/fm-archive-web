@@ -4105,7 +4105,7 @@ table.sq td.name a{color:var(--claret);text-decoration:none;border-bottom:1px do
 
 const BODY = `<div id="app" v-cloak>
   <component :is="view" :route="route"></component>
-  <div class="foot">자료: {{ D.club && D.club.name }} 세이브 · 저장 {{ D.savedAt }}<span v-if="open.length"> · 진행 중인 {{ open.join(', ') }} 시즌은 결산 전이라 싣지 않았다</span> · 상대 구단 이름은 추정 · 이적 금액은 파운드 · 트로피 순서는 종류 규칙(대륙 &gt; 1부 &gt; 국내 컵 &gt; 쉴드 &gt; 하부)으로 잡은 <b>추정</b>이다</div>
+  <div class="foot">자료: {{ D.club && D.club.name }} 세이브 · 저장 {{ D.savedAt }}<span v-if="open.length"> · {{ open.join(', ') }} 시즌은 순위 기록이 없다(시즌 중 이동이거나 진행 중)</span> · 상대 구단 이름은 추정 · 이적 금액은 파운드 · 트로피 순서는 종류 규칙(대륙 &gt; 1부 &gt; 국내 컵 &gt; 쉴드 &gt; 하부)으로 잡은 <b>추정</b>이다</div>
   <div class="tip" :class="{on:tip.on}" :style="{left:tip.x+'px',top:tip.y+'px'}" v-html="tip.html"></div>
 </div>
 
@@ -4122,18 +4122,18 @@ const BODY = `<div id="app" v-cloak>
       <div><b>{{ topLeagueWins }}</b>리그 우승</div><div><b>{{ D.awards ? D.awards.total : '—' }}</b>개인상</div>
     </div>
   </header>
-  <div class="scroll-hint"><i></i>아래로 내리면 시즌이 하나씩 펼쳐집니다 · 카드를 누르면 그 시즌으로 들어갑니다<span v-if="open.length" style="margin-left:auto">※ {{ open.join(', ') }} 시즌은 진행 중이라 결산 뒤에 실린다</span></div>
+  <div class="scroll-hint"><i></i>아래로 내리면 시즌이 하나씩 펼쳐집니다 · 카드를 누르면 그 시즌으로 들어갑니다<span v-if="open.length" style="margin-left:auto">※ {{ open.join(', ') }} 시즌은 순위 기록이 없다 (시즌 중 이동이거나 진행 중)</span></div>
   <div class="story">
     <template v-for="(t,i) in T" :key="t.season">
       <div class="yr" :class="{win: isTopWin(t)}">{{ t.season.slice(0,4) }}<small>{{ t.season }}</small></div>
-      <div class="rail"><div class="node" :class="['t'+tier(t), {win: honOf(t.season).length>0}]">{{ t.standing.pos }}</div></div>
+      <div class="rail"><div class="node" :class="['t'+tier(t), {win: honOf(t.season).length>0}]">{{ t.standing ? t.standing.pos : '·' }}</div></div>
       <div class="chap">
         <div class="card" :class="{win: honOf(t.season).length>0, pending: pending[i]}" tabindex="0" role="link" :aria-label="t.season+' 시즌 상세'" @click="open_(t,$event)" @keydown.enter.prevent="open_(t,$event)" @keydown.space.prevent="open_(t,$event)">
           <span class="more">자세히 →</span>
-          <div class="head"><span class="pos">{{ t.standing.pos }}<span>위 / {{ t.standing.teams }}팀</span></span><span class="div">{{ t.divName }}</span><span class="season">{{ t.season }}</span></div>
+          <div class="head"><span class="pos" v-if="t.standing">{{ t.standing.pos }}<span>위 / {{ t.standing.teams }}팀</span></span><span class="pos" v-else style="font-size:16px">순위 기록 없음</span><span class="div">{{ t.divName }}</span><span class="season">{{ t.season }}</span></div>
           <div class="row">
-            <div><h4>디비전</h4><div class="ladder"><i v-for="k in [5,4,3,2,1]" :key="k" :class="{on: k>=tier(t)}" :style="{height:(20+(6-k)*16)+'%'}" :title="k+'부'"></i></div></div>
-            <div><h4>전적</h4><div class="v"><b>{{ t.standing.w }}승 {{ t.standing.d }}무 {{ t.standing.l }}패</b><br><small>{{ t.standing.pts }}점 · 득실 {{ t.standing.gf }}:{{ t.standing.ga }}<template v-if="t.stats"> · 평점 {{ t.stats.avgRating }}</template></small></div></div>
+            <div v-if="t.standing"><h4>디비전</h4><div class="ladder"><i v-for="k in [5,4,3,2,1]" :key="k" :class="{on: k>=tier(t)}" :style="{height:(20+(6-k)*16)+'%'}" :title="k+'부'"></i></div></div>
+            <div v-if="t.standing"><h4>전적</h4><div class="v"><b>{{ t.standing.w }}승 {{ t.standing.d }}무 {{ t.standing.l }}패</b><br><small>{{ t.standing.pts }}점 · 득실 {{ t.standing.gf }}:{{ t.standing.ga }}<template v-if="t.stats"> · 평점 {{ t.stats.avgRating }}</template></small></div></div>
             <div v-if="honOf(t.season).length || lostOf(t.season).length"><h4>트로피</h4><div class="pills">
               <span v-for="h in honOf(t.season)" :key="'w'+h.name" class="pill cup">{{ h.short || h.name }}</span>
               <span v-for="h in lostOf(t.season)" :key="'l'+h.name" class="pill final">{{ h.short || h.name }} 준우승</span>
@@ -4347,10 +4347,14 @@ const SCRIPT = String.raw`<script>
   /* 디비전 번호 → 층. ⚠ 잉글랜드 번호다(7 = 1부 … 150 = 5부). 다른 나라면 5층으로 두고 이름만 보여준다. */
   var TIER = { 7: 1, 8: 2, 9: 3, 10: 4, 150: 5 }, TIERNAME = { 1: "프리미어", 2: "챔피언십", 3: "리그 1", 4: "리그 2", 5: "내셔널" };
   var tier = function (t) { return TIER[t.division] || 5; };
-  /* 결산: 순위표가 없는(진행 중) 시즌은 싣지 않는다 */
+  /* ★ 202: 순위표가 없는 시즌도 **싣는다.**
+   *   여기서 빼면 그 해가 화면에서 통째로 사라진다 — 사용자 화면에서 23-24 다음이 27-28 이었다.
+   *   순위가 없는 까닭은 "진행 중" 만이 아니다. **시즌 중에 팀을 옮기면** 그 구단의 한 시즌 표가 안 생긴다.
+   *   실측(7대리그 트레블): 35시즌 중 7시즌이 그랬고, 그 7장이 안 그려지고 있었다. */
   var TL = D.timeline || [];
   var OPEN = TL.filter(function (t) { return !t.standing; }).map(function (t) { return t.season; });
-  var T = TL.filter(function (t) { return t.standing; });
+  var T = TL;
+  var TS = TL.filter(function (t) { return t.standing; });   /* 차트는 순위가 있어야 그린다 */
   /* 트로피 — 이름 있는 1군 것만. 순서는 종류 규칙(LOG 170), 추정이다. */
   var HON = (D.honours || []).filter(function (h) { return h.name && !h.youth; });
   var rank = function (h) { var n = h.name || "";
@@ -4429,20 +4433,20 @@ const SCRIPT = String.raw`<script>
   /* 차트 — SVG 문자열. 이름은 esc 로. data-tip 은 툴팁이 읽는다. */
   function posChart(cur) {
     var W = 640, H = 170, pl = { l: 56, r: 10, t: 10, b: 22 }, iw = W - pl.l - pl.r, ih = H - pl.t - pl.b;
-    if (T.length < 2) return "";
-    var x = function (i) { return pl.l + i * iw / (T.length - 1); }, y = function (v) { return pl.t + v / 5 * ih; };
+    if (TS.length < 2) return "";
+    var x = function (i) { return pl.l + i * iw / (TS.length - 1); }, y = function (v) { return pl.t + v / 5 * ih; };
     var yv = function (t) { return (tier(t) - 1) + (t.standing.pos - 1) / t.standing.teams; };
     var s = "<svg viewBox='0 0 " + W + " " + H + "'>";
     for (var k = 0; k < 5; k++) s += "<rect x='" + pl.l + "' y='" + y(k) + "' width='" + iw + "' height='" + (ih / 5) + "' fill='var(--bg3)' opacity='" + (k % 2 ? 0 : .6) + "'/><text class='ax' x='" + (pl.l - 6) + "' y='" + (y(k) + 12) + "' text-anchor='end'>" + TIERNAME[k + 1] + "</text>";
-    var pts = T.map(function (t, i) { return [x(i), y(yv(t))]; });
+    var pts = TS.map(function (t, i) { return [x(i), y(yv(t))]; });
     var d = pts.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
     s += "<path d='" + d + "' fill='none' stroke='var(--t3)' stroke-width='2' class='ln' stroke-linejoin='round'/>";
-    T.forEach(function (t, i) { var me = i === cur; s += "<circle cx='" + pts[i][0] + "' cy='" + pts[i][1] + "' r='" + (me ? 7 : 3) + "' fill='" + (me ? "var(--claret)" : "var(--bg)") + "' stroke='" + (me ? "var(--claret)" : "var(--t3)") + "' stroke-width='2' data-tip='" + t.season + " · " + t.standing.pos + "위'/>" +
+    TS.forEach(function (t, i) { var me = i === cur; s += "<circle cx='" + pts[i][0] + "' cy='" + pts[i][1] + "' r='" + (me ? 7 : 3) + "' fill='" + (me ? "var(--claret)" : "var(--bg)") + "' stroke='" + (me ? "var(--claret)" : "var(--t3)") + "' stroke-width='2' data-tip='" + t.season + " · " + t.standing.pos + "위'/>" +
       "<text class='ax' x='" + pts[i][0] + "' y='" + (H - 6) + "' text-anchor='middle'" + (me ? " style='fill:var(--claret);font-weight:700'" : "") + ">" + t.season.slice(2, 4) + "</text>"; });
     return s + "</svg>";
   }
   function curveChart(season) {
-    var C = (D.curves || []).slice(0, 6), seasons = T.map(function (t) { return t.season; });
+    var C = (D.curves || []).slice(0, 6), seasons = TS.map(function (t) { return t.season; });
     if (!C.length || seasons.length < 2) return "";
     var W = 640, H = 200, pl = { l: 34, r: 90, t: 10, b: 22 }, iw = W - pl.l - pl.r, ih = H - pl.t - pl.b;
     var x = function (sn) { return pl.l + seasons.indexOf(sn) * iw / (seasons.length - 1); }, y = function (v) { return pl.t + ih - (v / 200) * ih; };
@@ -4527,7 +4531,7 @@ const SCRIPT = String.raw`<script>
       hofMax: function () { return Math.max(1, Math.max.apply(null, this.hofRows.map(function (h) { return h.win.length; }))); },
       squadRows: function () { return (D.squad || []).map(function (p) { return Object.assign({ key: keyOf(p), label: nameOf(p), dup: DUP[nameOf(p)] > 1, posText: (p.pos || []).map(function (t) { return META.positions[t] || t; }).join(" ") }, p); }).sort(function (a, b) { return (b.ca || 0) - (a.ca || 0); }); },
       endGrid: function () { var spend = 0, inc = 0; (D.transfers || []).forEach(function (t) { if (t.kind !== "fee") return; if (t.dir === "in") spend += t.fee; else inc += t.fee; });
-        var last = T[T.length - 1], g = [];
+        var last = TS[TS.length - 1], g = [];   /* ★ 202: 승점은 순위표에서 온다 — 순위 있는 마지막 시즌 */
         var top = HON.filter(function (h) { return rank(h) === 2 && h.win.length; })[0], ucl = HON.filter(function (h) { return rank(h) === 1 && h.win.length; })[0];
         if (top) g.push([top.win.length, (top.short || top.name) + " 우승"]);
         if (ucl) g.push([ucl.win.length, ucl.short || ucl.name]);
@@ -7880,12 +7884,19 @@ function build(cfg, log) {
     if (!T.length) throw new Error("연표가 없다");
     if (!H) throw new Error("명예표가 없다");
     const byComp = new Map(H.map((h) => [h.comp, h]));
-    let 더함 = 0, 이미 = 0, 새대회 = 0;
+
+    const SP = out.spells || [];
+    if (!SP.length) throw new Error("재임(spells)이 없다 — 빗장 없이는 안 붙인다");
+    const 끝까지 = (team, y0, 한해) => SP.some((p) =>
+      p.team === team && p.from <= y0 && p.to >= (한해 ? y0 : y0 + 1));
+    let 더함 = 0, 이미 = 0, 새대회 = 0, 중도퇴 = 0;
     for (const t of T) {
       const st = t.standing;
       if (!st || st.pos !== 1 || t.division == null) continue;
       const y0 = parseInt(String(t.season).slice(0, 4), 10);
       if (!y0) continue;
+      const 한해 = !/^\d{4}-\d{2}$/.test(String(t.season));
+      if (t.team != null && !끝까지(t.team, y0, 한해)) { 중도퇴++; continue; }
       let row = byComp.get(t.division);
       if (!row) {
         row = { comp: t.division, win: [], lose: [], third: [], summer: false,
@@ -7902,7 +7913,8 @@ function build(cfg, log) {
       더함++;
     }
     return "1위 시즌 " + (더함 + 이미) + "회 · 새로 채움 " + 더함 +
-           " · 이미 있던 것 " + 이미 + (새대회 ? " · 없던 대회 " + 새대회 + "종" : "");
+           " · 이미 있던 것 " + 이미 + (새대회 ? " · 없던 대회 " + 새대회 + "종" : "") +
+           (중도퇴 ? " · 시즌 중 떠나 안 침 " + 중도퇴 : "");
   }, note);
 
   part("⑩ 이적", () => {
@@ -9129,7 +9141,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="2508bb67";</script>
+<script>window.__BUILD="c3090322";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
