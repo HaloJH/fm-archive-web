@@ -8876,3 +8876,23 @@ function deepPanel() {
 }
 
 </script>
+
+<script>window.__BUILD="b2c1a6cb";</script>
+<script>
+(function () {
+  /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
+  var BUILD = window.__BUILD;
+  if (!BUILD || location.protocol === "file:") return;
+  var u = location.pathname.replace(/[^/]*$/, "") + "version.txt?t=" + Date.now();
+  fetch(u, { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : null; }).then(function (t) {
+    if (!t) return;
+    var ver = t.trim();
+    if (!ver || ver === BUILD) return;
+    try { if (sessionStorage.getItem("fm-archive:ver") === ver) return; sessionStorage.setItem("fm-archive:ver", ver); } catch (e) {}
+    var pick = document.getElementById("pick");
+    if (!pick || pick.hidden) return;   /* 이미 폴더를 읽는 중이면 건드리지 않는다 */
+    var here = new URL(location.href); here.searchParams.set("v", ver);
+    location.replace(here.toString());
+  }).catch(function () {});
+})();
+</script>
