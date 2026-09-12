@@ -6247,7 +6247,15 @@ function settle(cand, names, packIds) {
   const pack = new Set((packIds || []).map(Number));
   const out = new Map();
 
-  for (const 빗장 of [pack, names]) {
+  const 홀로 = (function () {
+    if (!names || !names.size) return names;
+    const 셈 = new Map();
+    for (const v of names.values()) { const k = (v && v.name) || ""; 셈.set(k, (셈.get(k) || 0) + 1); }
+    const m = new Map();
+    for (const [n, v] of names) if (셈.get((v && v.name) || "") === 1) m.set(n, v);
+    return m;
+  })();
+  for (const 빗장 of [pack, 홀로]) {
     if (!빗장 || !빗장.size) continue;
     for (const [a, set] of cand) {
       if (out.has(a)) continue;
@@ -7316,8 +7324,8 @@ function build(cfg, log) {
   }, note);
 
   part("⑫ 트로피 번호 다리", () => {
+
     const ids = cfg.trophyIds || [];
-    if (!ids.length) throw new Error("트로피 팩 번호 목록(cfg.trophyIds)이 없다 — 빗장 없이는 안 붙인다");
     const gd = (cfg.dumps && cfg.dumps.gameDb) || [];
     if (!gd.length) throw new Error("game_db 가 없다");
 
@@ -7340,10 +7348,13 @@ function build(cfg, log) {
       }
       if (Object.keys(map).length >= cups.length) break;
     }
-    if (!Object.keys(map).length) throw new Error("이은 대회가 없다");
+    if (!Object.keys(map).length)
+      throw new Error(ids.length ? "이은 대회가 없다"
+        : "트로피 팩이 없어 다리를 못 놓았다 — 컵 이름은 ⓪ 이름표로만 붙는다(팩이 있으면 훨씬 많이 붙는다)");
     out.compUid = map;
     return Object.keys(map).length + "/" + cups.length + "개 이음" +
-           (이름붙임 ? " · 이름 " + 이름붙임 + "개" : "");
+           (이름붙임 ? " · 이름 " + 이름붙임 + "개" : "") +
+           (ids.length ? "" : " · ⚠ 트로피 팩 없이 (이름 빗장만) — 팩이 있으면 훨씬 많이 붙는다");
   }, note);
 
   part("⑬ 리그 1위 = 우승", () => {
@@ -8639,7 +8650,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="d891faa3";</script>
+<script>window.__BUILD="900e1f29";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
