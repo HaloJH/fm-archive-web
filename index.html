@@ -8589,7 +8589,12 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("folder").addEventListener("change", (e) => handle([].slice.call(e.target.files)));
   $("backBtn").addEventListener("click", closeArchive);
 
-  window.addEventListener("popstate", function () { if (!$("archive").hidden) showList(); });
+  window.addEventListener("popstate", function () {
+    if ($("archive").hidden) return;
+
+    if (history.state && history.state.archive) return;
+    showList();
+  });
   window.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && !$("archive").hidden) closeArchive();
   });
