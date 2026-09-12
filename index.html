@@ -8669,8 +8669,11 @@ async function grabSections(file, say, journey) {
   const nameOf = new Map();
   for (const j of (journey || [])) for (const sn of (j.seasons || [])) nameOf.set(sn, j.club);
 
-  const teamAt = (season) => {
-    const mark = season.slice(0, 4) + "-08-01";
+  const 끝마크 = (season) => (/^\d{4}-\d{2}$/.test(season)
+    ? (parseInt(season.slice(0, 4), 10) + 1) + "-05-31"
+    : season.slice(0, 4) + "-11-30");
+  const teamAt = (season, 끝) => {
+    const mark = 끝 ? 끝마크(season) : season.slice(0, 4) + "-08-01";
     for (const sp of spells) if (sp.from <= mark && (!sp.until || mark < sp.until)) return sp.team;
     return null;
   };
@@ -8679,10 +8682,18 @@ async function grabSections(file, say, journey) {
   for (const j of hist.values()) for (const s of j.seasons) all.add(s.season);
   const rows = [];
   for (const sn of [...all].sort()) {
-    const t = teamAt(sn);
-    if (t == null) continue;
-    const j = hist.get(t);
-    const row = j && j.seasons.filter((x) => x.season === sn)[0];
+
+    const 후보 = [];
+    const 끝난곳 = teamAt(sn, true), 시작한곳 = teamAt(sn, false);
+    if (끝난곳 != null) 후보.push(끝난곳);
+    if (시작한곳 != null && 시작한곳 !== 끝난곳) 후보.push(시작한곳);
+    let row = null, t = null;
+    for (const c of 후보) {
+      const j = hist.get(c);
+      const r = j && j.seasons.filter((x) => x.season === sn)[0];
+      if (!r) continue;
+      row = r; t = c; break;
+    }
     if (!row) continue;
     row.team = t;
     row.club = nameOf.get(sn) || null;
@@ -9141,7 +9152,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="c3090322";</script>
+<script>window.__BUILD="43a973fa";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
