@@ -7323,40 +7323,6 @@ function build(cfg, log) {
       " · 순위 채움 " + 순위붙임 + "시즌";
   }, note);
 
-  part("⑫ 트로피 번호 다리", () => {
-
-    const ids = cfg.trophyIds || [];
-    const gd = (cfg.dumps && cfg.dumps.gameDb) || [];
-    if (!gd.length) throw new Error("game_db 가 없다");
-
-    const cups = (out.honours || []).filter((h) => h.kind === "cup" && h.comp).map((h) => h.comp);
-    if (!cups.length) throw new Error("컵이 없다");
-
-    const { scan, settle } = require(path.join(AR, "save", "comptrophy.js"));
-    const map = {};
-    let 이름붙임 = 0;
-    for (const file of gd) {
-      const { cand, names } = scan(fs.readFileSync(file), cups);
-      for (const [k, v] of settle(cand, names, ids)) if (map[k] == null) map[k] = v;
-
-      for (const h of out.honours || []) {
-        if (h.name || map[h.comp] == null) continue;
-        const v = names.get(map[h.comp]);
-        if (!v) continue;
-        h.name = v.name; h.short = v.short; h.nameFrom = "game_db";
-        이름붙임++;
-      }
-      if (Object.keys(map).length >= cups.length) break;
-    }
-    if (!Object.keys(map).length)
-      throw new Error(ids.length ? "이은 대회가 없다"
-        : "트로피 팩이 없어 다리를 못 놓았다 — 컵 이름은 ⓪ 이름표로만 붙는다(팩이 있으면 훨씬 많이 붙는다)");
-    out.compUid = map;
-    return Object.keys(map).length + "/" + cups.length + "개 이음" +
-           (이름붙임 ? " · 이름 " + 이름붙임 + "개" : "") +
-           (ids.length ? "" : " · ⚠ 트로피 팩 없이 (이름 빗장만) — 팩이 있으면 훨씬 많이 붙는다");
-  }, note);
-
   part("⑬ 리그 1위 = 우승", () => {
     const T = out.timeline || [], H = out.honours;
     if (!T.length) throw new Error("연표가 없다");
@@ -7413,6 +7379,56 @@ function build(cfg, log) {
     }
     return "채운 이름 " + 채움 + "종" + (보기.length ? " — " + 보기.join(" · ") : "") +
            (남음 ? " · 아직 이름 없는 대회 " + 남음 + "종" : "");
+  }, note);
+
+  part("⑫ 트로피 번호 다리", () => {
+
+    const ids = cfg.trophyIds || [];
+    const gd = (cfg.dumps && cfg.dumps.gameDb) || [];
+    if (!gd.length) throw new Error("game_db 가 없다");
+
+    const cups = (out.honours || []).filter((h) => h.kind === "cup" && h.comp).map((h) => h.comp);
+    if (!cups.length) throw new Error("컵이 없다");
+
+    const 리그이름 = new Map();
+    for (const h of out.honours || []) if (h.kind === "league" && h.comp && h.name) 리그이름.set(h.comp, h.name);
+    const 넘길것 = cups.concat([...리그이름.keys()]);
+
+    const { scan, settle } = require(path.join(AR, "save", "comptrophy.js"));
+    const map = {};
+    let 이름붙임 = 0, 리그붙임 = 0, 리그버림 = 0;
+    for (const file of gd) {
+      const { cand, names } = scan(fs.readFileSync(file), 넘길것);
+
+      for (const [k, v] of settle(cand, names, ids)) if (map[k] == null && !리그이름.has(k)) map[k] = v;
+
+      for (const [k, 아는이름] of 리그이름) {
+        if (map[k] != null) continue;
+        const set = cand.get(k);
+        if (!set) continue;
+        const 맞는것 = [...set].filter((v) => { const nm = names.get(v); return nm && nm.name === 아는이름; });
+        if (맞는것.length === 1) { map[k] = 맞는것[0]; 리그붙임++; }
+        else if (맞는것.length > 1) 리그버림++;
+      }
+
+      for (const h of out.honours || []) {
+        if (h.name || map[h.comp] == null) continue;
+        const v = names.get(map[h.comp]);
+        if (!v) continue;
+        h.name = v.name; h.short = v.short; h.nameFrom = "game_db";
+        이름붙임++;
+      }
+      if (Object.keys(map).length >= 넘길것.length) break;
+    }
+    if (!Object.keys(map).length)
+      throw new Error(ids.length ? "이은 대회가 없다"
+        : "트로피 팩이 없어 다리를 못 놓았다 — 컵 이름은 ⓪ 이름표로만 붙는다(팩이 있으면 훨씬 많이 붙는다)");
+    out.compUid = map;
+    return Object.keys(map).length + "/" + 넘길것.length + "개 이음" +
+           (이름붙임 ? " · 이름 " + 이름붙임 + "개" : "") +
+           (리그붙임 ? " · 리그 " + 리그붙임 + "개(이름 맞음)" : "") +
+           (리그버림 ? " · 리그 " + 리그버림 + "개는 이름이 안 맞아 버림" : "") +
+           (ids.length ? "" : " · ⚠ 트로피 팩 없이 (이름 빗장만) — 팩이 있으면 훨씬 많이 붙는다");
   }, note);
 
   part("⑩ 이적", () => {
@@ -8650,7 +8666,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="900e1f29";</script>
+<script>window.__BUILD="21235582";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
