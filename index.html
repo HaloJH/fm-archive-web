@@ -6965,7 +6965,14 @@ function scan(buf, cups) {
   }
   const names = new Map();
   for (const [id, set] of raw) {
-    const list = [...set].sort((x, y) => y.length - x.length);
+
+    let list = [...set].filter((t) => t.indexOf("_") < 0);
+    const 번역된것 = list.filter((t) => /[^\x00-]/.test(t));
+    let 확실한가 = true;
+    if (번역된것.length) list = 번역된것;
+    else if (list.length > 2) 확실한가 = false;
+    if (!확실한가 || !list.length) continue;
+    list = list.sort((x, y) => y.length - x.length);
     const name = list[0], short = list[list.length - 1];
 
     if (list.length > 1 && name.length === short.length) continue;
@@ -9090,7 +9097,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="fdec022d";</script>
+<script>window.__BUILD="ea4764ad";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
