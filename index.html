@@ -4370,9 +4370,12 @@ const SCRIPT = String.raw`<script>
     "UEFA Europa League": "UEFA 유로파 리그", "FIFA Club World Cup": "세계 클럽 선수권 대회",
     "UEFA Europa Conference League": "UEFA 컨퍼런스 리그" };
   var pix = function (h) {
+    /* ★ 195: 대회 **번호**로 먼저. 이름이 ? 인 대회가 여럿이라 이름으로는 못 가른다. */
+    var B = D.cupPixByComp;
+    if (B && h.comp != null && B[h.comp]) return B[h.comp];
     var G = D.cupPix; if (!G) return null;
     var nm = h.name || "", sh = h.short || "";
-    var tries = [nm, PIX[nm], sh, nm.replace(/^S+s+/, ""), "잉글랜드 " + nm];
+    var tries = [nm, PIX[nm], sh, nm.replace(/^\S+\s+/, ""), "잉글랜드 " + nm];
     for (var i = 0; i < tries.length; i++) { var k = tries[i]; if (k && G[k]) return G[k]; }
     return null;
   };
@@ -8109,6 +8112,9 @@ function show(data) {
 }
 
 const SPA_CACHE = new Map();
+
+let TROPHY_NOTE = "";
+const NOTE_CACHE = new Map();
 let LAST_MS = 0;
 
 function 읽기오류(e) {
@@ -8118,7 +8124,10 @@ function 읽기오류(e) {
   return (e && e.message) || String(e);
 }
 
+function withNote(name, note) { return note ? name + " · " + note : name; }
+
 function openArchive(id) {
+  TROPHY_NOTE = "";
   const pt = DATA.playthroughs.filter(function (x) { return x.id === id; })[0];
   const frame = document.getElementById("aframe");
   const nameEl = document.getElementById("aname");
@@ -8130,7 +8139,7 @@ function openArchive(id) {
 
   if (SPA_CACHE.has(id)) {
     frame.srcdoc = SPA_CACHE.get(id);
-    nameEl.textContent = pt ? pt.name : id;
+    nameEl.textContent = withNote(pt ? pt.name : id, NOTE_CACHE.get(id));
     return;
   }
 
@@ -8144,8 +8153,9 @@ function openArchive(id) {
   buildCareer(pt, say).then(function (html) {
     LAST_MS = Date.now() - t0;
     SPA_CACHE.set(id, html);
+    NOTE_CACHE.set(id, TROPHY_NOTE);
     frame.srcdoc = html;
-    nameEl.textContent = pt ? pt.name : id;
+    nameEl.textContent = withNote(pt ? pt.name : id, TROPHY_NOTE);
   }).catch(function (e) {
     console.error(e);
 
@@ -8341,21 +8351,34 @@ async function buildCareer(pt, say) {
   if (o) {
     if (pix) o.trophyPix = pix;
 
-    if (o.compUid && o.honours) {
-      o.cupPix = o.cupPix || {};
-      let got = 0;
-      for (const h of o.honours) {
-        const uid = o.compUid[h.comp];
-        if (!uid || !h.name || o.cupPix[h.name]) continue;
-        const file = TROPHY_FILES.get(String(uid));
-        if (!file) continue;
-        try { o.cupPix[h.name] = await shrink(file, 96); got++; } catch (e) {   }
-      }
-      if (got) say("트로피 " + got + "개를 팩에서 붙였습니다");
-    }
-    if (pix || o.cupPix) return careerHtml(o);
+    TROPHY_NOTE = await attachTrophies(o);
+    if (TROPHY_NOTE) say(TROPHY_NOTE);
+    if (pix || o.cupPix || o.cupPixByComp) return careerHtml(o);
   }
   return careerHtml(json);
+}
+
+async function attachTrophies(o) {
+  const pack = TROPHY_FILES.size;
+  if (!o || !o.honours) return "";
+  if (!pack) return "트로피 팩 없음 — graphics 안에 이름에 troph 가 든 폴더가 없습니다";
+  const uids = o.compUid ? Object.keys(o.compUid).length : 0;
+  if (!uids) return "트로피 팩 " + pack + "장 · 대회 번호 다리를 못 놓았습니다";
+  o.cupPix = o.cupPix || {};
+  o.cupPixByComp = o.cupPixByComp || {};
+  let got = 0, miss = 0;
+  for (const h of o.honours) {
+    const uid = o.compUid[h.comp];
+
+    if (!uid || h.comp == null || o.cupPixByComp[h.comp]) continue;
+    if (h.name && o.cupPix[h.name]) continue;
+    const file = TROPHY_FILES.get(String(uid));
+    if (!file) { miss++; continue; }
+    try { o.cupPixByComp[h.comp] = await shrink(file, 96); got++; }
+    catch (e) { miss++; }
+  }
+  if (!got) return "트로피 팩 " + pack + "장 · 다리 " + uids + "개 · 맞는 그림이 없습니다";
+  return "트로피 " + got + "개 붙임" + (miss ? " (" + miss + "개는 그림 없음)" : "");
 }
 
 function shrink(file, h) {
@@ -8666,7 +8689,9 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     window.__fm = { run: run, handle: handle, core: function () { return core; },
                     platform: function () { return platform; },
-                    walkHandle: walkHandle, walkEntry: walkEntry, decideDir: decideDir };
+                    walkHandle: walkHandle, walkEntry: walkEntry, decideDir: decideDir,
+
+                    classify: classify, attachTrophies: attachTrophies, trophyFiles: TROPHY_FILES };
   } catch (e) {
     $("boot").textContent = "불러오기 실패: " + e.message;
     console.error(e);
@@ -8992,7 +9017,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="e7d97c48";</script>
+<script>window.__BUILD="611af93b";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
