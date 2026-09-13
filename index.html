@@ -5822,7 +5822,25 @@ function readAll(paths) {
   return { map: all, files, clash };
 }
 
-module.exports = { readOne, readAll };
+const 표 = {
+  665:  { name: "잉글랜드 카라바오 컵",             short: "카라바오 컵",            표기: "18판 한결같음" },
+  45:   { name: "포르투갈 프리메이라 리가",          short: "프리메이라 리가",        표기: "다수결 17:2 (「프리메라 리가」가 둘)" },
+  650:  { name: "독일 DFB-포칼",                   short: "DFB-포칼",              표기: "6판 한결같음" },
+  158:  { name: "포르투갈 수퍼 컵",                 short: "수퍼 컵",               표기: "⚠ 1판뿐 — 근거가 제일 얇다" },
+  6989: { name: "유럽/남아메리카 클럽 챌린지",       short: "유럽/남미 클럽 챌린지",   표기: "2판 한결같음" },
+  151:  { name: "잉글랜드 더 빌드베이스 FA 트로피",  short: "FA 트로피",             표기: "다수결 3:1 (후원사 없는 「잉글랜드 FA 트로피」가 하나)" },
+  167:  { name: "AFC 챔피언스 리그",               short: "AFC 챔피언스 리그",      표기: "다수결 8:1" },
+  279:  { name: "대한민국 하나은행 코리아컵",        short: "하나은행 코리아컵",       표기: "다수결 6:1" },
+
+  163:  { name: "FIFA 클럽 월드컵", short: "클럽 월드컵",
+          표기: "★ 사용자 확정 (2026-09-14) — 성질은 쟀고(3위전 71% · 다양도 0.54) 이름 글자는 안 쟀다" },};
+
+function 물러서기(id) {
+  const v = 표[id];
+  return v ? { name: v.name, short: v.short, 표기: v.표기, 빌린것: true } : null;
+}
+
+module.exports = { readOne, readAll, 물러서기, 물러서기표: 표 };
 
 if (require.main === module) {
   const args = process.argv.slice(2);
@@ -6625,14 +6643,29 @@ function clubmapAnchors(dir, clubs, rank, year, mapper) {
 
 function 단조만(runs) {
   const n = runs.length, best = new Array(n).fill(0), prev = new Array(n).fill(-1);
+  const 순시작 = (r) => r.lo - r.off, 순끝 = (r) => r.hi - r.off;
   for (let i = 0; i < n; i++) {
     best[i] = runs[i].닻;
     for (let j = 0; j < i; j++)
-      if (runs[j].off <= runs[i].off && best[j] + runs[i].닻 > best[i]) { best[i] = best[j] + runs[i].닻; prev[i] = j; }
+      if (runs[j].off <= runs[i].off && 순끝(runs[j]) < 순시작(runs[i]) &&
+          best[j] + runs[i].닻 > best[i]) { best[i] = best[j] + runs[i].닻; prev[i] = j; }
   }
   let k = 0; for (let i = 1; i < n; i++) if (best[i] > best[k]) k = i;
   const keep = new Set(); for (let i = k; i >= 0; i = prev[i]) keep.add(i);
   return { kept: runs.filter((r, i) => keep.has(i)), dropped: runs.filter((r, i) => !keep.has(i)) };
+}
+
+function 사막자르기(bands) {
+  const out = [];
+  for (const b of bands) {
+    if (out.length) {
+      const 끝 = out[out.length - 1].hi;
+
+      if (b.lo - 끝 - 1 > 끝) break;
+    }
+    out.push(b);
+  }
+  return { kept: out, dropped: bands.slice(out.length) };
 }
 
 function 잇기(runs) {
@@ -6654,7 +6687,9 @@ function runBands(pairs, rank, minRun) {
     i = j + 1;
   }
   const { kept, dropped } = 단조만(날);
-  return { bands: 잇기(kept), anchors: A, 날: 날, 버린구간: dropped };
+  const 자름 = 사막자르기(잇기(kept));
+  return { bands: 자름.kept, anchors: A, 날: 날,
+           버린구간: dropped.concat(자름.dropped) , 사막버림: 자름.dropped };
 }
 
 function build(dir, saveName, truthPath, opts) {
@@ -6694,7 +6729,7 @@ function build(dir, saveName, truthPath, opts) {
   return { clubs, ids, rank, pairs, skipped, bands, anchors, clubOf, 닻출처, 버린구간 };
 }
 
-module.exports = { build, resolveNames, provenBands, runBands, 단조만, 잇기, clubmapAnchors, MINRUN };
+module.exports = { build, resolveNames, provenBands, runBands, 단조만, 잇기, 사막자르기, clubmapAnchors, MINRUN };
 if (require.main !== module) return;
 
 const DIR = process.argv[2], SAVE = process.argv[3];
@@ -7173,8 +7208,23 @@ function build(cfg, log) {
         }
       } catch (e) { say("  뉴스 쪽 대회 이름 합치기 실패: " + e.message); }
     }
+
+    let 빌림 = 0;
+    try {
+      const CNM = require(path.join(AR, "save", "compnames.js"));
+      for (const k of Object.keys(CNM.물러서기표 || {})) {
+        const id = Number(k);
+        if (COMP.has(id)) continue;
+        const v = CNM.물러서기(id);
+        if (!v || !v.name) continue;
+        COMP.set(id, v.name);
+        (out.compBorrowed = out.compBorrowed || {})[id] = { name: v.name, 표기: v.표기 };
+        빌림++;
+      }
+    } catch (e) { say("  물러서기 표 실패: " + e.message); }
     if (!COMP.size) { COMP = null; throw new Error("이름이 붙은 대회를 하나도 못 찾았다"); }
-    return COMP.size + "개 (game_db " + (COMP.size - 더함) + " + 뉴스 " + 더함 + ") — " +
+    return COMP.size + "개 (game_db " + (COMP.size - 더함 - 빌림) + " + 뉴스 " + 더함 +
+      (빌림 ? " + **빌림 " + 빌림 + "**" : "") + ") — " +
       [...COMP].slice(0, 3).map(([k, v]) => k + " " + v).join(" · ");
   }, note);
 
@@ -9579,7 +9629,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="72f541c9";</script>
+<script>window.__BUILD="9ba90182";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
