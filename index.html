@@ -9112,7 +9112,9 @@ async function buildCareer(pt, say) {
   }
   if (!club) throw new Error("이 카드에 구단이 없다");
 
-  일.put("/ar/data.json", JSON.stringify(DATA));
+  const 이구단만 = (DATA.clubs || []).filter(function (x) { return x.name === club; });
+  일.put("/ar/data.json", JSON.stringify(
+    이구단만.length ? Object.assign({}, DATA, { clubs: 이구단만 }) : DATA));
   if (window.__AWARDS_SRC) 일.put("/ar/save/awards.js", window.__AWARDS_SRC);
 
   const file = pt && pt.saveFile ? SAVE_FILES.get(pt.saveFile) : null;
@@ -10057,7 +10059,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="80072486";</script>
+<script>window.__BUILD="0a0dfa9f";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
