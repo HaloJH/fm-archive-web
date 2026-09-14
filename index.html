@@ -8971,6 +8971,29 @@ const 일 = {
 
 let 진행줄 = null;
 
+function 진행흘리기(say) {
+  let 마지막 = "", 시작 = Date.now();
+
+  const 그리기 = function () {
+    const 초 = Math.round((Date.now() - 시작) / 1000);
+    say("자료 만드는 중 · " + 초 + "초" + (마지막 ? " · 여기까지 " + 마지막 : ""));
+  };
+  진행줄 = function (글) {
+    const t = String(글).trim(); if (!t) return;
+
+    if (/^[⚠!]/.test(t) || /ENOENT|Error:|no such file/i.test(t)) return;
+
+    let 머리 = t.split(" — ")[0].replace(/\s*\(\d+ms\)\s*$/, "").trim();
+    if (머리.length > 30) { const 잘라 = 머리.slice(0, 30); const 틈 = 잘라.lastIndexOf(" ");
+      머리 = (틈 > 12 ? 잘라.slice(0, 틈) : 잘라).replace(/[·,\s]+$/, "") + "…"; }
+    마지막 = 머리;
+    그리기();
+  };
+
+  const 째깍 = setInterval(그리기, 1000);
+  return function 그만() { clearInterval(째깍); 진행줄 = null; };
+}
+
 const 쉬고돌리기 = async (name, argv, opts) => {
   if (일꾼) {
     const r = await 일꾼심부름("run", { 이름: name, argv: argv, opts: opts });
@@ -9360,9 +9383,13 @@ async function buildCareer(pt, say) {
     say("세이브가 없어 내보내기만으로 만듭니다");
   }
 
-  say("자료 만드는 중");
+  say("자료 만드는 중 — 열 갈래");
   일.put("/cfg.json", JSON.stringify(cfg));
-  const r = await 쉬고돌리기("payload.js", ["/cfg.json", "--out", "/payload.json"]);
+
+  const 그만 = 진행흘리기(say);
+  let r;
+  try { r = await 쉬고돌리기("payload.js", ["/cfg.json", "--out", "/payload.json"]); }
+  finally { 그만(); }
 
   try { window.__lastLog = r.log; } catch (e) {   }
   if (r.error) throw r.error;
@@ -10130,28 +10157,11 @@ async function spaBuild(file, wantNames, say) {
   일.put("/cfg.json", JSON.stringify(cfg));
 
   say("자료 만드는 중 — 열 갈래");
-  let 마지막 = "", 시작 = Date.now();
 
-  var 그리기 = function () {
-    var 초 = Math.round((Date.now() - 시작) / 1000);
-    say("자료 만드는 중 · " + 초 + "초" + (마지막 ? " — " + 마지막 : ""));
-  };
-  진행줄 = function (글) {
-    var t = String(글).trim(); if (!t) return;
-
-    if (/^[⚠!]/.test(t) || /ENOENT|Error:|no such file/i.test(t)) return;
-
-    var 머리 = t.split(" — ")[0].replace(/s*(d+ms)s*$/, "").trim();
-    if (머리.length > 30) { var 잘라 = 머리.slice(0, 30); var 틈 = 잘라.lastIndexOf(" ");
-      머리 = (틈 > 12 ? 잘라.slice(0, 틈) : 잘라).replace(/[·,s]+$/, "") + "…"; }
-    마지막 = 머리;
-    그리기();
-  };
-
-  var 째깍 = setInterval(그리기, 1000);
+  const 그만 = 진행흘리기(say);
   let r;
   try { r = await 쉬고돌리기("payload.js", ["/cfg.json", "--out", "/payload.json"]); }
-  finally { clearInterval(째깍); 진행줄 = null; }
+  finally { 그만(); }
   if (r.error) throw r.error;
   const v = r.files.get("/payload.json");
   const payload = JSON.parse(typeof v === "string" ? v : new TextDecoder().decode(v));
@@ -10255,7 +10265,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="399925eb";</script>
+<script>window.__BUILD="44b2f4ec";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
