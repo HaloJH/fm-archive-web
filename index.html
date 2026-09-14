@@ -5140,16 +5140,25 @@ function realTeams() {
 }
 
 let _번호표 = undefined;
+let _uid거절 = 0;
+
+function 표에있나(a, x) {
+  let lo = 0, hi = a.length - 1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (a[m] === x) return true; if (a[m] < x) lo = m + 1; else hi = m - 1; }
+  return false;
+}
 function uidOf(tableId) {
   if (_번호표 === undefined) {
     try { _번호표 = CLUBS.번호표(CLUBS.scan(b, { withNoNation: true })); }
     catch (e) { _번호표 = null; }
   }
   if (!_번호표 || tableId == null) return null;
+
+  if (!표에있나(_번호표, tableId)) { _uid거절++; return null; }
   return CLUBS.uidOf(_번호표, tableId);
 }
 
-return { clubOf, realTeams, pts, clubs, uidOf };
+return { clubOf, realTeams, pts, clubs, uidOf, uid거절: () => _uid거절 };
 }
 module.exports = { buildMapper };
 
@@ -6724,6 +6733,24 @@ const fs = require("fs");
 const path = require("path");
 const { scan, byId } = require("./clubs.js");
 
+function 이름으로(clubs) {
+  const 표 = new Map();
+  const 넣 = (n, id) => { if (!n) return; if (!표.has(n)) 표.set(n, new Set()); 표.get(n).add(id); };
+  let 뺌 = 0;
+  for (const [id, c] of clubs) {
+    if (c.noNation) { 뺌++; continue; }
+    넣(c.full, id); 넣(c.short, id);
+  }
+  let 겹침 = 0; for (const [, s] of 표) if (s.size > 1) 겹침++;
+  return {
+    크기: 표.size, 겹침: 겹침, 뺌: 뺌,
+
+    찾기(이름) { const s = 표.get(이름); return s && s.size === 1 ? [...s][0] : null; },
+
+    후보수(이름) { const s = 표.get(이름); return s ? s.size : 0; },
+  };
+}
+
 function resolveNames(clubs, table) {
   const vals = [...clubs.values()];
   const pairs = [], skipped = [];
@@ -6856,6 +6883,8 @@ function runBands(pairs, rank, minRun, opts) {
 
 function build(dir, saveName, truthPath, opts) {
   const 올해 = (opts && opts.year) || null;
+
+  const 문턱 = (opts && Number.isInteger(opts.minRun) && opts.minRun >= 1) ? opts.minRun : MINRUN;
   const gdb = path.join(dir, "game_db.dat");
   if (!fs.existsSync(gdb)) throw new Error("game_db.dat 이 있어야 한다: " + dir);
 
@@ -6879,14 +6908,14 @@ function build(dir, saveName, truthPath, opts) {
 
     닻출처 = "표지";
     ({ pairs, skipped } = 표지닻(바이트, [...rank.keys()].sort((a, b) => a - b), rank, opts));
-    ({ bands, anchors, 버린구간 } = runBands(pairs, rank, MINRUN, { 사막자르기: false }));
+    ({ bands, anchors, 버린구간 } = runBands(pairs, rank, 문턱, { 사막자르기: false }));
     if (!bands.length) {
 
       if (!올해 && !(opts && opts.mapper)) throw new Error("표지닻으로 구간이 안 서고 **올해**도 없다 — " +
         "build(dir, save, truthPath, { year }). clubmap 으로 물러서려면 올해가 있어야 한다.");
       닻출처 = "clubmap";
       ({ pairs, skipped } = clubmapAnchors(dir, clubs, rank, 올해, opts && opts.mapper));
-      ({ bands, anchors, 버린구간 } = runBands(pairs, rank, MINRUN));
+      ({ bands, anchors, 버린구간 } = runBands(pairs, rank, 문턱));
     }
   }
 
@@ -6896,7 +6925,8 @@ function build(dir, saveName, truthPath, opts) {
     }
     return null;
   };
-  return { clubs, ids, rank, pairs, skipped, bands, anchors, clubOf, 닻출처, 버린구간 };
+  return { clubs, ids, rank, pairs, skipped, bands, anchors, clubOf, 닻출처, 버린구간, 이름표: 이름으로(clubs),
+           문턱: 문턱, 문턱쓰임: 닻출처 !== "정답지" };
 }
 
 function 구멍조이기(bands, 진짜팀) {
@@ -6924,7 +6954,7 @@ function 구멍조이기(bands, 진짜팀) {
   return { 답: 답, 모순: 모순 };
 }
 
-module.exports = { build, resolveNames, provenBands, runBands, 단조만, 잇기, 사막자르기, 표지닻, clubmapAnchors, 구멍조이기, MINRUN };
+module.exports = { build, resolveNames, 이름으로, provenBands, runBands, 단조만, 잇기, 사막자르기, 표지닻, clubmapAnchors, 구멍조이기, MINRUN };
 if (require.main !== module) return;
 
 const DIR = process.argv[2], SAVE = process.argv[3];
@@ -7919,7 +7949,10 @@ function 구단뽑기(clubs, 이름) {
       const Y = (v) => Number(String(v).slice(0, 4));
       const 겹침 = (j, a, b) => (j.seasons || []).filter((t) => { const y = Y(t); return y >= a && y <= b; }).length;
 
-      const 칸 = (SPELLS && SPELLS.length)
+      const 조각있음 = !!(SPELLS && SPELLS.length);
+      if (!조각있음) say("  ⚠ 재임 조각(`cfg.spells`)이 없어 **합친 재임**으로 내려간다 — " +
+                         "한 팀의 여러 재임이 한 줄이라 이름이 엉뚱한 시즌을 덮을 수 있다 (`spellNames.합친재임` 참).");
+      const 칸 = 조각있음
         ? SPELLS.map((sp) => ({ sp: sp, a: Y(sp.from), b: sp.until ? Y(sp.until) - 1 : 9999, done: false }))
         : out.spells.map((sp) => ({ sp: sp, a: sp.from, b: sp.to, done: false }));
       const 쓴구단 = new Set(), 정답 = new Map(), 어긋남 = new Set();
@@ -7943,9 +7976,9 @@ function 구단뽑기(clubs, 이름) {
       for (const sp of out.spells) {
         if (sp.name) continue;
         const nm = 정답.get(sp.team);
-        if (nm) { sp.name = nm; sp.nameFrom = '내보내기'; 붙음++; }
+        if (nm) { sp.name = nm; sp.nameFrom = 조각있음 ? '내보내기' : '내보내기(합친재임)'; 붙음++; }
       }
-      out.spellNames = { 붙음: 붙음, 전체: out.spells.length, 어긋남: [...어긋남] };
+      out.spellNames = { 붙음: 붙음, 전체: out.spells.length, 어긋남: [...어긋남], 합친재임: !조각있음 };
 
       const 팀이름 = new Map();
       for (const sp of out.spells) if (sp.name) 팀이름.set(sp.team, sp.name);
@@ -7968,23 +8001,39 @@ function 구단뽑기(clubs, 이름) {
         let 담음 = 0, 기권 = 0, 이름붙임 = 0;
 
         const 셈 = new Map();
-        const 재는중 = (team) => {
+        const 어긋남 = [];
+
+        const 재는중 = (team, 이름) => {
           if (셈.has(team)) return 셈.get(team);
-          let v = null;
           const c = t.clubOf(team);
-          if (c) { const uid = mp.uidOf(c.id); const nm = c.full || c.short;
-            if (uid != null && nm) v = { nm: nm, uid: uid }; }
+          const 구id = c ? c.id : null;
+          const 이id = (이름 && t.이름표) ? t.이름표.찾기(이름) : null;
+          let v = null;
+          if (구id != null && 이id != null && 구id !== 이id) {
+            어긋남.push(team + ": 구단표 " + 구id + " ↔ 이름(" + 이름 + ") " + 이id);
+          } else {
+            const 어디 = (구id != null && 이id != null) ? "맞댐" : (구id != null ? "구단표" : "이름길");
+
+            const 쓸id = (어디 === "이름길") ? (cfg.이름길 ? 이id : null) : 구id;
+            if (쓸id != null) {
+              const uid = mp.uidOf(쓸id);
+              const nm = (c && (c.full || c.short)) || 이름;
+              if (uid != null && nm) v = { nm: nm, uid: uid, 어디: 어디, tbl: 쓸id };
+            }
+          }
           셈.set(team, v);
           return v;
         };
         for (const sp of out.spells) {
-          const v = 재는중(sp.team);
+          const v = 재는중(sp.team, sp.name);
           if (!v) continue;
-          if (!sp.name) { sp.name = v.nm; sp.nameFrom = "구단표"; 이름붙임++; }
+          if (!sp.name) { sp.name = v.nm; sp.nameFrom = v.어디; 이름붙임++; }
 
           const 열쇠 = sp.name;
           if (!out.clubUid || out.clubUid[열쇠] == null) {
             out.clubUid = Object.assign({}, out.clubUid, { [열쇠]: v.uid });
+
+            out.clubUidFrom = Object.assign({}, out.clubUidFrom, { [열쇠]: v.어디 });
             담음++;
           }
         }
@@ -7998,7 +8047,11 @@ function 구단뽑기(clubs, 이름) {
           const nm2 = 팀이름2.get(tl.team);
           if (nm2) { tl.club = nm2; tl.clubFrom = "재임"; 연표붙임2++; }
         }
-        out.spellUid = { 담음: 담음, 기권: 기권, 이름붙임: 이름붙임, 재임: 셈.size, 연표붙임: 연표붙임2 };
+        { let 구단표길 = 0, 이름길 = 0, 맞댐 = 0;
+          for (const [, v] of 셈) if (v) (v.어디 === "이름길" ? 이름길++ : (v.어디 === "맞댐" ? 맞댐++ : 구단표길++));
+
+          out.spellUid = { 담음: 담음, 기권: 기권, 이름붙임: 이름붙임, 재임: 셈.size, 연표붙임: 연표붙임2,
+                           맞댐: 맞댐, 구단표길: 구단표길, 이름길: 이름길, 어긋남: 어긋남 }; }
         if (!담음) throw new Error("재임 " + 셈.size + "곳 모두 증명된 구간 밖이다 (기권 " + 기권 + ")");
         return "재임 구단 " + 셈.size + "곳 중 **" + 담음 + "곳**에 uid 를 담았다 (기권 " + 기권 + ")" +
                (이름붙임 ? " · 이름도 새로 붙인 곳 " + 이름붙임 : "") +
@@ -8594,6 +8647,23 @@ function 구단뽑기(clubs, 이름) {
     if (담음) say("  · 연표 " + 담음 + "시즌에 구단 이름을 담았다 (내보내기 시즌 축)");
     if (어긋남.length) say("  ⚠⚠ 연표와 내보내기가 **다른 구단**을 말하는 시즌 " + 어긋남.length +
                            "개 — 안 덮었다: " + 어긋남.join(" · "));
+  }
+
+  {
+    const t = _tidDone ? _tid : null;
+    if (t) {
+      const 칸 = (t.bands || []).reduce((a, b) => a + (b.hi - b.lo + 1), 0);
+      out.팀번호길 = { 닻출처: t.닻출처, 문턱: t.문턱 == null ? null : t.문턱,
+                       문턱쓰임: !!t.문턱쓰임, 구간: (t.bands || []).length, 덮는칸: 칸,
+                       물러섬: t.닻출처 === "clubmap" };
+      if (t.닻출처 === "clubmap")
+        say("  ⚠⚠ 팀번호표가 **`clubmap` 으로 물러섰다** (표지닻으로 구간이 하나도 안 섰다). " +
+            "이 판의 구단 이름은 **증명이 아니라 74~76% 짜리 추정**이다 — `팀번호길.물러섬` 참.");
+      else say("  · 팀번호길: " + t.닻출처 + " 닻 · 구간 " + (t.bands || []).length + "개 · " + 칸 + "칸" +
+               (t.문턱쓰임 ? " · 문턱 " + t.문턱 : " · 문턱 안 씀(정답지 길)"));
+    } else {
+      out.팀번호길 = { 닻출처: null, 까닭: _tidDone ? "팀번호표를 못 세웠다" : "이 판에서 팀번호표를 안 불렀다" };
+    }
   }
 
   const ORDER = ["club", "generatedAt", "savedAt", "timeline", "squad", "curves",
@@ -9279,6 +9349,8 @@ async function buildCareer(pt, say) {
       award: at["award_year_hist_dt"],
       compHistory: at["comp_history_dt"] || null,
 
+      personHistory: at["person_record_history_dt"] || null,
+
       news: [at["news"], at["play_fixture_manager"]].concat(at.matchFiles || []).filter(Boolean),
       gameDb: at.gameDb ? [at.gameDb] : [],
       clubmapDir: at.gameDb ? "/save" : null,
@@ -9443,7 +9515,7 @@ async function grabSections(file, say, journey) {
 
   const WANT = ["person_record_manager", "player_stats_hist_dt", "tc_league_history_dt",
                 "tc_cup_history_dt", "award_year_hist_dt", "comp_history_dt", "news",
-                "play_fixture_manager", "game_db"];
+                "play_fixture_manager", "person_record_history_dt", "game_db"];
   let total = TAIL, done = TAIL;
   for (const n of WANT) {
     const e = idx.entries.find((x) => x.name === n);
@@ -9482,7 +9554,7 @@ async function grabSections(file, say, journey) {
     at[n] = v;
   }
 
-  for (const n of ["comp_history_dt", "news", "play_fixture_manager"]) { const v = await grab(n); if (v) at[n] = v; }
+  for (const n of ["comp_history_dt", "news", "play_fixture_manager", "person_record_history_dt"]) { const v = await grab(n); if (v) at[n] = v; }
 
   at.matchFiles = [];
   const matches = idx.entries.filter((e) => /^\d+_\d+/.test(e.name)).slice(0, 120);
@@ -10042,6 +10114,8 @@ async function spaBuild(file, wantNames, say) {
       award: at["award_year_hist_dt"],
       compHistory: at["comp_history_dt"] || null,
 
+      personHistory: at["person_record_history_dt"] || null,
+
       news: [at["news"], at["play_fixture_manager"]].concat(at.matchFiles || []).filter(Boolean),
       gameDb: gdb ? [gdb] : [],
       clubmapDir: gdb ? "/save" : null,
@@ -10181,7 +10255,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="602d1d6b";</script>
+<script>window.__BUILD="399925eb";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
