@@ -74,3 +74,5 @@ Football Manager 폴더를 끌어다 놓으면 됩니다. 설치도 로그인도
 zstd 압축 해제는 [fzstd](https://github.com/101arrowz/fzstd) (MIT) 를 씁니다.
 사본 라이선스는 `THIRD-PARTY-fzstd.LICENSE` 에 있습니다.
 화면은 [Vue 3](https://vuejs.org) (MIT) 로 그립니다. 사본 라이선스는 `THIRD-PARTY-vue.LICENSE` 에 있습니다.
+선 그래프의 곡선은 [d3-path · d3-shape](https://github.com/d3/d3-shape) (ISC) 를 씁니다.
+사본 라이선스는 `THIRD-PARTY-d3-shape.LICENSE` 에 있습니다.
