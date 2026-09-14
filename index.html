@@ -8651,6 +8651,12 @@ let core = null, platform = null, render = null;
 const SAVE_FILES = new Map();
 
 const TROPHY_FILES = new Map();
+
+const 경로꼴 = (p) => "/" + String(p).replace(/\\/g, "/").toLowerCase();
+const 트로피인가 = (p) => p.endsWith(".png") && p.indexOf("troph") >= 0 &&
+  (p.indexOf("/default/") >= 0 || /^\d+\.png$/.test(p.split("/").pop()));
+const 트로피담기 = (p, 꺼내기) => TROPHY_FILES.set(p.split("/").pop().replace(/.png$/, ""), 꺼내기);
+
 let DATA = null;
 
 async function boot() {
@@ -8687,10 +8693,9 @@ function classify(files) {
     } else if (p.endsWith(".fm")) {
       if (p.indexOf("/games/") >= 0) fm.push(f);
       else looseFm.push(f);
-    } else if (p.endsWith(".png") && p.indexOf("troph") >= 0 &&
-               (p.indexOf("/default/") >= 0 || /^\d+\.png$/.test(p.split("/").pop()))) {
+    } else if (트로피인가(p)) {
 
-      TROPHY_FILES.set(p.split("/").pop().replace(/.png$/, ""), f);
+      트로피담기(p, function () { return f; });
     } else if (p.endsWith(".png") && p.indexOf("logo") >= 0 && p.indexOf("club") >= 0 &&
                p.indexOf("default") < 0 && p.indexOf("small") < 0 &&
                LOGO_FILE.test(p.split("/").pop())) {
@@ -9201,9 +9206,10 @@ async function attachTrophies(o) {
 
     if (!uid || h.comp == null || o.cupPixByComp[h.comp]) continue;
     if (h.name && o.cupPix[h.name]) continue;
-    const file = TROPHY_FILES.get(String(uid));
-    if (!file) { miss++; continue; }
-    try { o.cupPixByComp[h.comp] = await shrink(file, 96); got++; }
+    const 꺼내기 = TROPHY_FILES.get(String(uid));
+    if (!꺼내기) { miss++; continue; }
+
+    try { o.cupPixByComp[h.comp] = await shrink(await 꺼내기(), 96); got++; }
     catch (e) { miss++; }
   }
   if (!got) return "트로피 팩 " + pack + "장 · 다리 " + uids + "개 · 맞는 그림이 없습니다";
@@ -9265,9 +9271,9 @@ async function trophyPix() {
   const WANT = { "silver plate": "plate", "national cup 1": "cup", "national championship 1": "league" };
   const out = {};
   for (const k in WANT) {
-    const f = TROPHY_FILES.get(k);
-    if (!f) continue;
-    try { out[WANT[k]] = await shrink(f, 96); } catch (e) {   }
+    const 꺼내기 = TROPHY_FILES.get(k);
+    if (!꺼내기) continue;
+    try { out[WANT[k]] = await shrink(await 꺼내기(), 96); } catch (e) {   }
   }
   return Object.keys(out).length ? out : null;
 }
@@ -9564,11 +9570,18 @@ const setPath = (f, p) => {
 };
 
 async function walkEntry(entry, out, prefix, depth, inherit, onScan, probeLeft) {
+  onScan(out.length);
   if (entry.isFile) {
     if (!wantFile(entry.name, inherit)) return;
+
+    if (inherit === "trophy") {
+      const tp = 경로꼴(prefix + entry.name);
+      if (트로피인가(tp))
+        트로피담기(tp, () => new Promise((res, rej) => entry.file(res, rej)));
+      return;
+    }
     const f = await new Promise((res, rej) => entry.file(res, rej));
     out.push(setPath(f, prefix + entry.name));
-    onScan(out.length);
     return;
   }
   if (!entry.isDirectory) return;
@@ -9600,10 +9613,15 @@ async function walkHandle(dir, out, prefix, depth, inherit, onScan, probeLeft) {
   let seen = 0;
   for await (const [name, h] of dir.entries()) {
     if (mode === "probe" && ++seen > PROBE_CAP) return;
+    onScan(out.length);
     if (h.kind === "file") {
       if (!wantFile(name, mode)) continue;
+      if (mode === "trophy") {
+        const tp = 경로꼴(prefix + name);
+        if (트로피인가(tp)) 트로피담기(tp, () => h.getFile());
+        continue;
+      }
       out.push(setPath(await h.getFile(), prefix + name));
-      onScan(out.length);
     } else {
       await walkHandle(h, out, prefix + name + "/", depth + 1, mode, onScan, next);
     }
@@ -9631,11 +9649,17 @@ window.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  let 본칸 = -1, 그린때 = 0;
   const scanning = (n) => {
+    본칸++;
+    const 이제 = Date.now();
+    if (본칸 > 0 && 이제 - 그린때 < 120) return;
+    그린때 = 이제;
     $("pick").hidden = true;
     $("progress").hidden = false;
     $("bar").style.width = "0%";
-    $("ptext").textContent = "폴더를 훑는 중… 찾은 파일 " + n + "개";
+    $("ptext").textContent = "폴더를 훑는 중… 살펴본 칸 " + 본칸.toLocaleString() +
+                             " · 가져온 파일 " + n + "개";
   };
 
   async function collect(fn) {
@@ -10033,7 +10057,7 @@ function deepPanel() {
 
 </script>
 
-<script>window.__BUILD="3fac1aaf";</script>
+<script>window.__BUILD="80072486";</script>
 <script>
 (function () {
   /* 새 판이 올라왔으면 **사용자가 아무것도 안 해도** 스스로 갈아탄다. 위 머리말 참고. */
